@@ -9,6 +9,7 @@ from atm.layers.transmission import TransmissionLayer
 
 
 def receive_loop(transport: TransmissionLayer) -> None:
+    """Mantiene al cajero escuchando mientras la consola permanece disponible."""
     while True:
         try:
             received = transport.recibir_informacion()
@@ -33,9 +34,11 @@ def receive_loop(transport: TransmissionLayer) -> None:
 
 
 def run(host: str, port: int) -> None:
+    """Conecta el cajero y coordina el recorrido emisor/receptor por capas."""
     with socket.create_connection((host, port)) as sock:
         print(f"[CAJERO] Conectado a {host}:{port}")
         transport = TransmissionLayer(sock)
+        # La recepcion vive en otro hilo para permitir mensajes en ambos sentidos.
         receiver = threading.Thread(target=receive_loop, args=(transport,), daemon=True)
         receiver.start()
 
@@ -67,6 +70,7 @@ def run(host: str, port: int) -> None:
 
 
 def main() -> None:
+    """Procesa host/puerto configurables e inicia la aplicacion interactiva."""
     parser = argparse.ArgumentParser(description="Cajero CC3067 - Laboratorio 2")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=9000)

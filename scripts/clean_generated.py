@@ -3,6 +3,7 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# La lista explicita evita borrar accidentalmente archivos que no genera el proyecto.
 TARGETS = (
     ROOT / "data" / "experiment_results.csv",
     ROOT / "data" / "experiment_summary.json",

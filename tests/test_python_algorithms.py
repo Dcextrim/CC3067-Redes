@@ -11,6 +11,8 @@ from atm.layers import link, noise, presentation  # noqa: E402
 
 
 class HammingTests(unittest.TestCase):
+    """Vectores manuales, longitudes genericas y correccion de un bit."""
+
     def test_manual_hamming_7_4_vector(self):
         self.assertEqual(hamming.required_parity_bits(4), 3)
         self.assertEqual(hamming.encode("1011"), "0110011")
@@ -37,6 +39,8 @@ class HammingTests(unittest.TestCase):
 
 
 class CRC32Tests(unittest.TestCase):
+    """Vectores IEEE, padding corto y deteccion en datos/redundancia."""
+
     def test_ieee_known_vector(self):
         bits = presentation.codificar_mensaje("123456789")
         self.assertEqual(crc32.calculate(bits), 0xCBF43926)
@@ -57,6 +61,8 @@ class CRC32Tests(unittest.TestCase):
 
 
 class LayerTests(unittest.TestCase):
+    """Contratos entre Presentacion, Enlace y Ruido."""
+
     def test_presentation_round_trip(self):
         bits = presentation.codificar_mensaje("A bank message")
         self.assertEqual(bits[:8], "01000001")

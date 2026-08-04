@@ -10,6 +10,8 @@ from atm.layers.transmission import TransmissionLayer  # noqa: E402
 
 
 class TransmissionTests(unittest.TestCase):
+    """Comprueba que el framing conserva limites sobre un stream."""
+
     def test_binary_frame_survives_tcp_stream(self):
         left, right = socket.socketpair()
         try:

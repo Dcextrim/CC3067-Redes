@@ -31,10 +31,12 @@ FIGURES = ROOT / "figures"
 
 
 def message_for_size(size: int) -> str:
+    """Genera contenido ASCII determinista para una longitud dada."""
     return "".join(chr(ord("A") + index % 26) for index in range(size))
 
 
 def run_experiment() -> list[dict[str, int | float | str]]:
+    """Evalua cada combinacion y clasifica entrega, rechazo o error silencioso."""
     rng = random.Random(SEED)
     rows: list[dict[str, int | float | str]] = []
     for algorithm in ALGORITHMS:
@@ -80,6 +82,7 @@ def run_experiment() -> list[dict[str, int | float | str]]:
 
 
 def save_data(rows: list[dict[str, int | float | str]]) -> None:
+    """Persiste resultados y metadatos suficientes para reproducir la muestra."""
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     with DATA_PATH.open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0]), lineterminator="\n")
@@ -99,6 +102,7 @@ def save_data(rows: list[dict[str, int | float | str]]) -> None:
 
 
 def configure_plot() -> None:
+    """Define un estilo comun y legible para todas las figuras."""
     plt.rcParams.update(
         {
             "font.family": "DejaVu Sans",
@@ -116,6 +120,7 @@ def configure_plot() -> None:
 
 
 def plot_overhead(rows: list[dict[str, int | float | str]]) -> None:
+    """Grafica redundancia relativa frente al tamano del mensaje."""
     unique = [row for row in rows if float(row["error_rate"]) == 0.0]
     colors = {"hamming": "#007C83", "crc32": "#D2691E"}
     fig, axis = plt.subplots(figsize=(7.2, 4.0))
@@ -144,6 +149,7 @@ def plot_overhead(rows: list[dict[str, int | float | str]]) -> None:
 
 
 def plot_recovery(rows: list[dict[str, int | float | str]]) -> None:
+    """Compara recuperacion exacta por algoritmo, longitud y tasa de error."""
     palette = plt.get_cmap("viridis")
     fig, axes = plt.subplots(1, 2, figsize=(8.2, 3.8), sharey=True)
     for axis, algorithm in zip(axes, ALGORITHMS):
@@ -173,6 +179,7 @@ def plot_recovery(rows: list[dict[str, int | float | str]]) -> None:
 
 
 def plot_outcomes(rows: list[dict[str, int | float | str]]) -> None:
+    """Separa entregas exactas, rechazos y corrupcion silenciosa a 16 bytes."""
     size = 16
     selected = [row for row in rows if int(row["message_bytes"]) == size]
     labels: list[str] = []
@@ -209,6 +216,7 @@ def plot_outcomes(rows: list[dict[str, int | float | str]]) -> None:
 
 
 def main() -> None:
+    """Ejecuta la simulacion completa y genera todos sus artefactos."""
     FIGURES.mkdir(parents=True, exist_ok=True)
     configure_plot()
     rows = run_experiment()

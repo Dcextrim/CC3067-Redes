@@ -4,6 +4,7 @@ import random
 
 
 def parse_probability(value: str) -> float:
+    """Acepta una tasa decimal o una fraccion, por ejemplo 0.01 o 1/100."""
     text = value.strip()
     try:
         if "/" in text:
@@ -22,6 +23,7 @@ def parse_probability(value: str) -> float:
 
 
 def aplicar_ruido(bits: str, probability: float, rng: random.Random | None = None) -> tuple[str, int]:
+    """Voltea cada bit de manera independiente y retorna la cantidad de flips."""
     if any(bit not in "01" for bit in bits):
         raise ValueError("la cadena solo puede contener bits 0 y 1")
     if not 0.0 <= probability <= 1.0:
@@ -29,6 +31,7 @@ def aplicar_ruido(bits: str, probability: float, rng: random.Random | None = Non
     source = rng or random
     output: list[str] = []
     flips = 0
+    # Un generador inyectable permite que las pruebas y experimentos sean repetibles.
     for bit in bits:
         if source.random() < probability:
             output.append("1" if bit == "0" else "0")

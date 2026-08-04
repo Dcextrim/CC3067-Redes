@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class DecodeResult:
+    """Resultado inmutable de verificar y decodificar una palabra Hamming."""
+
     data_bits: str
     corrected: bool
     syndrome: int
@@ -13,6 +15,7 @@ class DecodeResult:
 
 
 def _validate_bits(bits: str) -> None:
+    """Valida la representacion textual usada por todos los algoritmos."""
     if any(bit not in "01" for bit in bits):
         raise ValueError("la cadena solo puede contener bits 0 y 1")
 
@@ -37,11 +40,13 @@ def encode(data_bits: str) -> str:
     codeword = [0] * (len(data_bits) + parity_count + 1)  # indice cero no usado
     data_index = 0
 
+    # Las potencias de dos se reservan; los datos ocupan el resto en orden.
     for position in range(1, len(codeword)):
         if position & (position - 1):
             codeword[position] = int(data_bits[data_index])
             data_index += 1
 
+    # Cada paridad cubre las posiciones cuyo indice contiene su bit activo.
     for parity_position in (1 << i for i in range(parity_count)):
         parity = 0
         for position in range(1, len(codeword)):
@@ -53,6 +58,7 @@ def encode(data_bits: str) -> str:
 
 
 def _syndrome(codeword: list[int], parity_count: int) -> int:
+    """Combina las paridades fallidas para localizar el bit alterado."""
     syndrome = 0
     for parity_position in (1 << i for i in range(parity_count)):
         parity = 0
@@ -85,6 +91,7 @@ def decode(encoded_bits: str, message_length: int) -> DecodeResult:
     corrected = False
 
     if syndrome:
+        # En SEC el sindrome es la posicion, numerada desde uno, que se voltea.
         if syndrome >= len(codeword):
             return DecodeResult(
                 "", False, syndrome, False,

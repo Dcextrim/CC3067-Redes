@@ -18,12 +18,14 @@ from atm.layers.transmission import TransmissionLayer  # noqa: E402
 
 
 def free_port() -> int:
+    """Reserva temporalmente un puerto local y devuelve el numero asignado."""
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
 
 
 def connect_with_retry(port: int, timeout: float = 15.0) -> socket.socket:
+    """Espera a que el proceso Go termine de compilar e inicie la escucha."""
     deadline = time.monotonic() + timeout
     last_error: OSError | None = None
     while time.monotonic() < deadline:
@@ -36,6 +38,7 @@ def connect_with_retry(port: int, timeout: float = 15.0) -> socket.socket:
 
 
 def run_case(server_binary: Path, algorithm: str) -> None:
+    """Verifica Go->Python y Python->Go con un algoritmo sobre TCP real."""
     port = free_port()
     environment = os.environ.copy()
     environment["GODEBUG"] = ""
@@ -133,6 +136,7 @@ def run_reaccept_case(server_binary: Path) -> None:
 
 
 def main() -> None:
+    """Compila una vez el servidor y ejecuta todos los escenarios cruzados."""
     with tempfile.TemporaryDirectory(prefix="cc3067-lab2-") as temp_directory:
         suffix = ".exe" if os.name == "nt" else ""
         server_binary = Path(temp_directory) / f"lab2-server{suffix}"

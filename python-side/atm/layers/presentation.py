@@ -2,6 +2,7 @@
 
 
 def codificar_mensaje(message: str) -> str:
+    """Codifica cada caracter ASCII como un octeto binario MSB primero."""
     try:
         raw = message.encode("ascii")
     except UnicodeEncodeError as exc:
@@ -10,6 +11,7 @@ def codificar_mensaje(message: str) -> str:
 
 
 def decodificar_mensaje(bits: str) -> str:
+    """Reconstruye texto ASCII solo cuando la longitud y los valores son validos."""
     if any(bit not in "01" for bit in bits):
         raise ValueError("la cadena solo puede contener bits 0 y 1")
     if len(bits) % 8:

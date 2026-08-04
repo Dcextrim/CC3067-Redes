@@ -7,6 +7,7 @@ import threading
 
 MAGIC = b"CC67"
 VERSION = 1
+# magic, version, algoritmo, flags, longitud original y longitud de trama.
 HEADER = struct.Struct("!4sBBHII")
 MAX_FRAME_BITS = 8 * 1024 * 1024
 ALGORITHM_IDS = {"hamming": 1, "crc32": 2}
@@ -15,12 +16,15 @@ ID_ALGORITHMS = {value: key for key, value in ALGORITHM_IDS.items()}
 
 @dataclass(frozen=True)
 class ReceivedFrame:
+    """Trama reconstruida a partir del encabezado y cuerpo del stream TCP."""
+
     algorithm: str
     message_bit_length: int
     frame_bits: str
 
 
 def pack_bits(bits: str) -> bytes:
+    """Empaqueta bits MSB primero y completa el ultimo octeto con ceros."""
     if any(bit not in "01" for bit in bits):
         raise ValueError("la cadena solo puede contener bits 0 y 1")
     padded = bits + "0" * ((8 - len(bits) % 8) % 8)
@@ -28,6 +32,7 @@ def pack_bits(bits: str) -> bytes:
 
 
 def unpack_bits(data: bytes, bit_length: int) -> str:
+    """Recupera la longitud logica y descarta el padding del ultimo octeto."""
     bits = "".join(f"{byte:08b}" for byte in data)
     if bit_length > len(bits):
         raise ValueError("el cuerpo no contiene suficientes bits")
@@ -35,6 +40,7 @@ def unpack_bits(data: bytes, bit_length: int) -> str:
 
 
 def _recv_exact(sock: socket.socket, length: int) -> bytes | None:
+    """Lee exactamente length bytes porque una llamada recv puede ser parcial."""
     chunks = bytearray()
     while len(chunks) < length:
         chunk = sock.recv(length - len(chunks))
@@ -47,11 +53,14 @@ def _recv_exact(sock: socket.socket, length: int) -> bytes | None:
 
 
 class TransmissionLayer:
+    """Encapsula framing y E/S TCP; no interpreta la integridad del cuerpo."""
+
     def __init__(self, sock: socket.socket):
         self._sock = sock
         self._send_lock = threading.Lock()
 
     def enviar_informacion(self, algorithm: str, message_bit_length: int, frame_bits: str) -> None:
+        """Envia de forma contigua un encabezado CC67 y el cuerpo empaquetado."""
         if algorithm not in ALGORITHM_IDS:
             raise ValueError("algoritmo no soportado")
         if not 0 <= message_bit_length <= 0xFFFFFFFF:
@@ -66,6 +75,7 @@ class TransmissionLayer:
             self._sock.sendall(header + pack_bits(frame_bits))
 
     def recibir_informacion(self) -> ReceivedFrame | None:
+        """Delimita una trama del stream o retorna None ante un cierre limpio."""
         raw_header = _recv_exact(self._sock, HEADER.size)
         if raw_header is None:
             return None
