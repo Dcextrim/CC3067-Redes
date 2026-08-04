@@ -1,3 +1,4 @@
+// Package noise simula un canal binario simetrico entre Enlace y Transmision.
 package noise
 
 import (
@@ -7,6 +8,7 @@ import (
 	"strings"
 )
 
+// ParseProbability acepta una tasa decimal o una fraccion como 1/100.
 func ParseProbability(value string) (float64, error) {
 	text := strings.TrimSpace(value)
 	var probability float64
@@ -34,12 +36,14 @@ func ParseProbability(value string) (float64, error) {
 	return probability, nil
 }
 
+// AplicarRuido evalua cada bit de forma independiente y cuenta los flips.
 func AplicarRuido(bits string, probability float64, source *rand.Rand) (string, int, error) {
 	if probability < 0 || probability > 1 {
 		return "", 0, fmt.Errorf("la probabilidad debe estar entre 0 y 1")
 	}
 	output := []byte(bits)
 	flips := 0
+	// La fuente inyectable permite pruebas y experimentos deterministas.
 	for index, bit := range output {
 		if bit != '0' && bit != '1' {
 			return "", 0, fmt.Errorf("la cadena solo puede contener bits 0 y 1")

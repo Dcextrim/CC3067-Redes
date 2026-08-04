@@ -1,3 +1,4 @@
+// Package application implementa la interfaz de usuario del servidor bancario.
 package application
 
 import (
@@ -9,6 +10,7 @@ import (
 	"cc3067/lab2/go-side/internal/layers/link"
 )
 
+// OutgoingRequest agrupa los valores solicitados antes de recorrer las capas.
 type OutgoingRequest struct {
 	Message         string
 	Algorithm       string
@@ -16,6 +18,7 @@ type OutgoingRequest struct {
 }
 
 func readLine(reader *bufio.Reader, writer io.Writer, prompt string) (string, error) {
+	// Reader se inyecta para desacoplar la consola de las pruebas y del transporte.
 	fmt.Fprint(writer, prompt)
 	line, err := reader.ReadString('\n')
 	if err != nil && len(line) == 0 {
@@ -24,6 +27,7 @@ func readLine(reader *bufio.Reader, writer io.Writer, prompt string) (string, er
 	return strings.TrimRight(line, "\r\n"), nil
 }
 
+// SolicitarMensaje obtiene texto, algoritmo y tasa sin codificar ni transmitir.
 func SolicitarMensaje(reader *bufio.Reader, writer io.Writer) (OutgoingRequest, error) {
 	message, err := readLine(reader, writer, "Mensaje ASCII (o /salir): ")
 	if err != nil {
@@ -47,6 +51,7 @@ func SolicitarMensaje(reader *bufio.Reader, writer io.Writer) (OutgoingRequest, 
 	return OutgoingRequest{message, algorithm, probability}, nil
 }
 
+// MostrarMensaje presenta una entrega valida o un error de las capas inferiores.
 func MostrarMensaje(message, errorMessage string, corrected bool) {
 	if errorMessage != "" {
 		fmt.Printf("\n[APLICACION] ERROR: %s\n", errorMessage)

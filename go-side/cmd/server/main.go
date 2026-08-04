@@ -19,6 +19,7 @@ import (
 )
 
 func receiveLoop(layer *transmission.Layer, done chan<- struct{}) {
+	// Esta goroutine mantiene la recepcion activa mientras la consola envia.
 	defer close(done)
 	for {
 		received, err := layer.RecibirInformacion()
@@ -45,6 +46,7 @@ func receiveLoop(layer *transmission.Layer, done chan<- struct{}) {
 }
 
 func sendRequest(layer *transmission.Layer, request application.OutgoingRequest, source *rand.Rand) error {
+	// El orden refleja el recorrido emisor: Presentacion, Enlace, Ruido, Transmision.
 	probability, err := noise.ParseProbability(request.ProbabilityText)
 	if err != nil {
 		return err
@@ -69,6 +71,7 @@ func sendRequest(layer *transmission.Layer, request application.OutgoingRequest,
 }
 
 func consoleLoop(reader *bufio.Reader, requests chan<- application.OutgoingRequest) {
+	// Un canal desacopla el bloqueo de stdin del ciclo que atiende la conexion.
 	defer close(requests)
 	for {
 		request, err := application.SolicitarMensaje(reader, os.Stdout)
@@ -84,6 +87,7 @@ func consoleLoop(reader *bufio.Reader, requests chan<- application.OutgoingReque
 }
 
 func handleConnection(connection net.Conn, requests <-chan application.OutgoingRequest) {
+	// done permite volver a Accept inmediatamente cuando el cajero se desconecta.
 	defer connection.Close()
 	layer := transmission.New(connection)
 	done := make(chan struct{})
@@ -92,6 +96,7 @@ func handleConnection(connection net.Conn, requests <-chan application.OutgoingR
 	activeRequests := requests
 
 	for {
+		// Se atienden eventos de red y solicitudes locales sin bloquear uno al otro.
 		select {
 		case <-done:
 			return
@@ -123,6 +128,7 @@ func main() {
 	}
 	defer listener.Close()
 	fmt.Printf("[SERVIDOR] Escuchando en %s:%d\n", *host, *port)
+	// La consola se crea una sola vez y puede alimentar conexiones sucesivas.
 	requests := make(chan application.OutgoingRequest)
 	go consoleLoop(bufio.NewReader(os.Stdin), requests)
 	for {

@@ -1,3 +1,4 @@
+// Package algorithms contiene los esquemas de integridad de la capa de Enlace.
 package algorithms
 
 import (
@@ -46,12 +47,14 @@ func HammingEncode(dataBits string) (string, error) {
 	r, _ := RequiredParityBits(len(dataBits))
 	codeword := make([]byte, len(dataBits)+r+1)
 	dataIndex := 0
+	// Las potencias de dos se reservan para paridad; el resto recibe los datos.
 	for position := 1; position < len(codeword); position++ {
 		if position&(position-1) != 0 {
 			codeword[position] = dataBits[dataIndex] - '0'
 			dataIndex++
 		}
 	}
+	// Una paridad cubre los indices que tienen activo su bit correspondiente.
 	for parityPosition := 1; parityPosition < (1 << r); parityPosition <<= 1 {
 		parity := byte(0)
 		for position := 1; position < len(codeword); position++ {
@@ -70,6 +73,7 @@ func HammingEncode(dataBits string) (string, error) {
 }
 
 func hammingSyndrome(codeword []byte, parityCount int) int {
+	// La suma de paridades fallidas forma la posicion binaria del error.
 	syndrome := 0
 	for parityPosition := 1; parityPosition < (1 << parityCount); parityPosition <<= 1 {
 		parity := byte(0)
@@ -108,6 +112,7 @@ func HammingDecode(encodedBits string, messageLength int) HammingResult {
 	syndrome := hammingSyndrome(codeword, r)
 	corrected := false
 	if syndrome != 0 {
+		// Hamming SEC corrige un bit volteando la posicion indicada por el sindrome.
 		if syndrome >= len(codeword) {
 			return HammingResult{Valid: false, Syndrome: syndrome, Error: "el sindrome apunta fuera de la trama; error no corregible"}
 		}

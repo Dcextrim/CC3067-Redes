@@ -1,3 +1,4 @@
+// Package presentation transforma mensajes ASCII y cadenas binarias.
 package presentation
 
 import (

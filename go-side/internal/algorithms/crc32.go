@@ -5,9 +5,11 @@ import (
 	"strings"
 )
 
+// CRC32ReflectedPolynomial es la forma reflejada del polinomio IEEE 0x04C11DB7.
 const CRC32ReflectedPolynomial uint32 = 0xEDB88320
 
 func paddedBytes(bits string) ([]byte, error) {
+	// El convenio del protocolo rellena hasta 32 bits y despues a un octeto.
 	if err := validateBits(bits); err != nil {
 		return nil, err
 	}
@@ -42,6 +44,7 @@ func CRC32Calculate(bits string) (uint32, error) {
 	for _, value := range data {
 		crc ^= uint32(value)
 		for range 8 {
+			// El desplazamiento a la derecha implementa el polinomio reflejado.
 			if crc&1 != 0 {
 				crc = (crc >> 1) ^ CRC32ReflectedPolynomial
 			} else {
@@ -52,6 +55,7 @@ func CRC32Calculate(bits string) (uint32, error) {
 	return crc ^ 0xFFFFFFFF, nil
 }
 
+// CRC32ChecksumBits serializa el resultado MSB primero aunque el calculo sea reflejado.
 func CRC32ChecksumBits(bits string) (string, error) {
 	crc, err := CRC32Calculate(bits)
 	if err != nil {
@@ -60,6 +64,7 @@ func CRC32ChecksumBits(bits string) (string, error) {
 	return fmt.Sprintf("%032b", crc), nil
 }
 
+// CRC32Encode conserva los datos y agrega 32 bits de checksum al final.
 func CRC32Encode(dataBits string) (string, error) {
 	checksum, err := CRC32ChecksumBits(dataBits)
 	if err != nil {
@@ -68,6 +73,7 @@ func CRC32Encode(dataBits string) (string, error) {
 	return dataBits + checksum, nil
 }
 
+// CRC32Verify separa los datos con messageLength y compara el checksum recibido.
 func CRC32Verify(frameBits string, messageLength int) (bool, string, string) {
 	if err := validateBits(frameBits); err != nil {
 		return false, "", err.Error()

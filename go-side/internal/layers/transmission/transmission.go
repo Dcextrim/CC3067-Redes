@@ -1,3 +1,4 @@
+// Package transmission implementa framing binario y entrada/salida TCP.
 package transmission
 
 import (
@@ -10,8 +11,11 @@ import (
 )
 
 const (
-	Version      = byte(1)
-	HeaderSize   = 16
+	// Version identifica el formato CC67 utilizado por ambos lenguajes.
+	Version = byte(1)
+	// HeaderSize suma magic, version, algoritmo, flags y dos longitudes.
+	HeaderSize = 16
+	// MaxFrameBits limita memoria y longitudes corruptas recibidas.
 	MaxFrameBits = 8 * 1024 * 1024
 )
 
@@ -20,22 +24,26 @@ var magic = [4]byte{'C', 'C', '6', '7'}
 var algorithmIDs = map[string]byte{"hamming": 1, "crc32": 2}
 var idAlgorithms = map[byte]string{1: "hamming", 2: "crc32"}
 
+// ReceivedFrame contiene el cuerpo y metadatos reconstruidos desde el stream.
 type ReceivedFrame struct {
 	Algorithm        string
 	MessageBitLength int
 	FrameBits        string
 }
 
+// Layer protege la escritura concurrente y conserva la conexion TCP activa.
 type Layer struct {
 	connection net.Conn
 	sendMutex  sync.Mutex
 }
 
+// New crea una capa de Transmision sobre una conexion ya establecida.
 func New(connection net.Conn) *Layer {
 	return &Layer{connection: connection}
 }
 
 func packBits(bits string) ([]byte, error) {
+	// El primer bit de cada grupo ocupa el MSB; el ultimo octeto usa padding cero.
 	for _, bit := range bits {
 		if bit != '0' && bit != '1' {
 			return nil, fmt.Errorf("la cadena solo puede contener bits 0 y 1")
@@ -53,6 +61,7 @@ func packBits(bits string) ([]byte, error) {
 }
 
 func unpackBits(data []byte, bitLength int) (string, error) {
+	// bitLength elimina el padding sin alterar ceros validos del mensaje.
 	if bitLength > len(data)*8 {
 		return "", fmt.Errorf("el cuerpo no contiene suficientes bits")
 	}
@@ -64,6 +73,7 @@ func unpackBits(data []byte, bitLength int) (string, error) {
 	return builder.String()[:bitLength], nil
 }
 
+// EnviarInformacion escribe un encabezado CC67 y su cuerpo como una sola trama.
 func (layer *Layer) EnviarInformacion(algorithm string, messageBitLength int, frameBits string) error {
 	algorithmID, ok := algorithmIDs[algorithm]
 	if !ok {
@@ -79,6 +89,7 @@ func (layer *Layer) EnviarInformacion(algorithm string, messageBitLength int, fr
 	if err != nil {
 		return err
 	}
+	// Todos los campos multiocteto usan big-endian, igual que Python.
 	header := make([]byte, HeaderSize)
 	copy(header[0:4], magic[:])
 	header[4] = Version
@@ -90,6 +101,7 @@ func (layer *Layer) EnviarInformacion(algorithm string, messageBitLength int, fr
 	layer.sendMutex.Lock()
 	defer layer.sendMutex.Unlock()
 	packet := append(header, body...)
+	// net.Conn puede aceptar una escritura parcial, por eso se repite hasta vaciar.
 	for len(packet) > 0 {
 		written, writeErr := layer.connection.Write(packet)
 		if writeErr != nil {
@@ -103,6 +115,7 @@ func (layer *Layer) EnviarInformacion(algorithm string, messageBitLength int, fr
 	return nil
 }
 
+// RecibirInformacion delimita una trama o retorna nil ante un cierre limpio.
 func (layer *Layer) RecibirInformacion() (*ReceivedFrame, error) {
 	header := make([]byte, HeaderSize)
 	if _, err := io.ReadFull(layer.connection, header); err != nil {
