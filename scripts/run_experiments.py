@@ -82,7 +82,7 @@ def run_experiment() -> list[dict[str, int | float | str]]:
 def save_data(rows: list[dict[str, int | float | str]]) -> None:
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     with DATA_PATH.open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
