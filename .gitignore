@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+go-side/bank-server.exe
+go-side/bank-server
+tmp/
+output/
+*.pdf
+report_config.json
+scripts/generate_report.py
