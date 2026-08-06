@@ -55,8 +55,7 @@ func VerificarIntegridad(frameBits, algorithm string, messageLength int) Integri
 		return IntegrityResult{Error: err.Error()}
 	}
 	if selected == Hamming {
-		result := algorithms.HammingDecode(frameBits, messageLength)
-		return IntegrityResult{result.Valid, result.DataBits, result.Corrected, result.Error, result.Syndrome}
+		return CorregirMensaje(frameBits, messageLength)
 	}
 	ok, data, message := algorithms.CRC32Verify(frameBits, messageLength)
 	return IntegrityResult{OK: ok, MessageBits: data, Error: message}

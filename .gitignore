@@ -1,10 +1,15 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
-go-side/bank-server.exe
-go-side/bank-server
+bank-server.exe
+bank-server
 tmp/
 output/
+*:Zone.Identifier
+
+# El reporte final es lo unico que se versiona en informe/; el resto de PDFs
+# sueltos (enunciado, borradores) y el generador automatico quedan fuera.
 *.pdf
+!informe/*.pdf
 report_config.json
-scripts/generate_report.py
+generate_report.py

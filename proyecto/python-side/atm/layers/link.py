@@ -38,18 +38,17 @@ def calcular_integridad(message_bits: str, algorithm: str) -> str:
 
 
 def verificar_integridad(frame_bits: str, algorithm: str, message_length: int) -> IntegrityResult:
-    """Verifica una trama y devuelve datos solo si el algoritmo la acepta."""
+    """Verifica una trama; delega en corregir_mensaje cuando el algoritmo puede reparar errores."""
     selected = normalize_algorithm(algorithm)
     if selected == HAMMING:
-        result = hamming.decode(frame_bits, message_length)
-        return IntegrityResult(result.valid, result.data_bits, result.corrected, result.error, result.syndrome)
+        return corregir_mensaje(frame_bits, message_length)
 
     ok, data, error = crc32.verify(frame_bits, message_length)
     return IntegrityResult(ok, data, False, error)
 
 
 def corregir_mensaje(frame_bits: str, message_length: int) -> IntegrityResult:
-    """Servicio explicito de correccion para Hamming."""
+    """Servicio de Enlace: verifica Hamming y corrige el bit senalado por el sindrome."""
     result = hamming.decode(frame_bits, message_length)
     return IntegrityResult(result.valid, result.data_bits, result.corrected, result.error, result.syndrome)
 
