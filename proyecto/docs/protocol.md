@@ -76,6 +76,38 @@ Vector de control: ASCII `123456789` produce `0xCBF43926`, es decir,
 El receptor separa los ultimos 32 bits, recalcula el checksum sobre los primeros
 `message_bit_length` bits y compara. Si difieren, informa el error a Aplicacion y no decodifica.
 
+## Aplicacion
+
+El contenido que atraviesa Presentacion es texto ASCII plano, separado por `|`. El cajero
+inicia cada peticion pidiendo algoritmo y tasa de ruido; el banco responde de forma automatica
+por el mismo pipeline, con probabilidad de ruido fija en `0.0` (no hay una consola pidiendole
+una tasa a un humano en el banco).
+
+Peticiones (cajero -> banco):
+
+```text
+LOGIN|<tarjeta>|<pin>
+WITHDRAW|<monto>          ; formato "%.2f"
+LOGOUT
+```
+
+Respuestas (banco -> cajero):
+
+```text
+LOGIN_OK|<mensaje>
+LOGIN_DENIED|<mensaje>
+WITHDRAW_OK|<monto>|<saldo>
+WITHDRAW_ERROR|<mensaje>
+LOGOUT_OK|<mensaje>
+ERROR|<mensaje>            ; no autenticado, comando invalido, o trama corrupta detectada en Enlace
+```
+
+Si Enlace rechaza la peticion (`ok=false`), el banco nunca ejecuta la accion y aun asi puede
+responder `ERROR|Transmision corrupta, reintente`, porque el encabezado de Transmision -- que
+lleva el algoritmo -- nunca recibe ruido. El cajero sabe entonces que reintentar es seguro. Si en
+cambio la respuesta es la que llega corrupta, el resultado queda ambiguo y el cajero no reintenta
+solo; se lo informa al usuario.
+
 ## Flujo por capas
 
 ```text
@@ -83,5 +115,7 @@ Aplicacion -> Presentacion -> Enlace -> Ruido -> Transmision -> TCP
 TCP -> Transmision -> Enlace -> Presentacion -> Aplicacion
 ```
 
-Ambos extremos ejecutan los dos flujos: el cajero Python inicia la conexion y el servidor Go
-permanece escuchando. En cada extremo un hilo/goroutine recibe mientras la consola permite enviar.
+El cajero Python inicia la conexion y ejecuta ambos flujos de forma sincrona: manda una peticion
+y bloquea hasta recibir la respuesta antes de continuar. El servidor Go permanece escuchando y
+atiende cada conexion en su propia goroutine, ejecutando el flujo receptor sobre la peticion y el
+flujo emisor sobre la respuesta automatica, sin intervencion interactiva de un humano.

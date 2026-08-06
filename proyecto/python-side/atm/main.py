@@ -2,71 +2,105 @@
 
 import argparse
 import socket
-import threading
 
 from atm.layers import application, link, noise, presentation
 from atm.layers.transmission import TransmissionLayer
 
 
-def receive_loop(transport: TransmissionLayer) -> None:
-    """Mantiene al cajero escuchando mientras la consola permanece disponible."""
+def enviar_comando(transport: TransmissionLayer, command_text: str) -> application.Respuesta:
+    """Pide algoritmo/ruido, envia un comando y bloquea hasta recibir la respuesta."""
+    params = application.solicitar_parametros_envio()
+    probability = noise.parse_probability(params.probability_text)
+    message_bits = presentation.codificar_mensaje(command_text)
+    frame_bits = link.calcular_integridad(message_bits, params.algorithm)
+    noisy_frame, flips = noise.aplicar_ruido(frame_bits, probability)
+    transport.enviar_informacion(params.algorithm, len(message_bits), noisy_frame)
+    print(
+        f"[RUIDO] {flips} bit(s) volteado(s) de {len(frame_bits)}; "
+        f"redundancia={len(frame_bits) - len(message_bits)} bits"
+    )
+
+    received = transport.recibir_informacion()
+    if received is None:
+        raise ConnectionError("el servidor cerro la conexion")
+    integrity = link.verificar_integridad(
+        received.frame_bits, received.algorithm, received.message_bit_length
+    )
+    if not integrity.ok:
+        raise application.TransmisionCorrupta(integrity.error or "error de integridad")
+    try:
+        text = presentation.decodificar_mensaje(integrity.message_bits)
+    except ValueError as exc:
+        raise application.TransmisionCorrupta(str(exc)) from exc
+    if integrity.corrected:
+        print("[APLICACION] Hamming corrigio un bit en la respuesta")
+    try:
+        return application.parse_respuesta(text)
+    except ValueError as exc:
+        raise application.TransmisionCorrupta(str(exc)) from exc
+
+
+def flujo_login(transport: TransmissionLayer) -> None:
+    """Reintenta el login hasta autenticarse; un LOGIN no tiene efectos secundarios."""
     while True:
+        credenciales = application.solicitar_credenciales()
         try:
-            received = transport.recibir_informacion()
-            if received is None:
-                print("\n[TRANSMISION] El servidor cerro la conexion.")
-                return
-            integrity = link.verificar_integridad(
-                received.frame_bits, received.algorithm, received.message_bit_length
+            respuesta = enviar_comando(
+                transport, application.comando_login(credenciales.card, credenciales.pin)
             )
-            if not integrity.ok:
-                application.mostrar_mensaje(error=integrity.error or "error de integridad")
+        except application.TransmisionCorrupta as exc:
+            print(f"\n[APLICACION] ERROR: {exc}")
+            print("[APLICACION] El LOGIN no tiene efectos secundarios; reintentando es seguro.")
+            continue
+        application.mostrar_respuesta(respuesta)
+        if respuesta.action == "LOGIN_OK":
+            return
+        print("[APLICACION] Intente de nuevo.")
+
+
+def flujo_menu(transport: TransmissionLayer) -> None:
+    """Atiende el menu de retiro/salida hasta que el usuario cierra sesion."""
+    while True:
+        opcion = application.solicitar_opcion_menu()
+        if opcion == "1":
+            try:
+                amount = application.solicitar_monto()
+            except ValueError as exc:
+                print(f"\n[APLICACION] ERROR: {exc}")
                 continue
             try:
-                message = presentation.decodificar_mensaje(integrity.message_bits)
-            except ValueError as exc:
-                application.mostrar_mensaje(error=str(exc))
+                respuesta = enviar_comando(transport, application.comando_retiro(amount))
+            except application.TransmisionCorrupta as exc:
+                print(f"\n[APLICACION] ERROR: {exc}")
+                print(
+                    "[APLICACION] No se pudo confirmar el retiro; "
+                    "verifique su saldo antes de reintentar."
+                )
                 continue
-            application.mostrar_mensaje(message, corrected=integrity.corrected)
-        except (ConnectionError, OSError, ValueError) as exc:
-            application.mostrar_mensaje(error=f"recepcion fallida: {exc}")
+            application.mostrar_respuesta(respuesta)
+        elif opcion == "2":
+            try:
+                respuesta = enviar_comando(transport, application.comando_logout())
+            except application.TransmisionCorrupta as exc:
+                print(f"\n[APLICACION] ERROR: {exc}")
+                print("[APLICACION] Se cerrara la sesion localmente de todas formas.")
+                return
+            application.mostrar_respuesta(respuesta)
             return
+        else:
+            print("[APLICACION] Opcion invalida.")
 
 
 def run(host: str, port: int) -> None:
-    """Conecta el cajero y coordina el recorrido emisor/receptor por capas."""
+    """Conecta el cajero y recorre login -> menu sobre la misma conexion TCP."""
     with socket.create_connection((host, port)) as sock:
         print(f"[CAJERO] Conectado a {host}:{port}")
         transport = TransmissionLayer(sock)
-        # La recepcion vive en otro hilo para permitir mensajes en ambos sentidos.
-        receiver = threading.Thread(target=receive_loop, args=(transport,), daemon=True)
-        receiver.start()
-
-        while receiver.is_alive():
-            try:
-                request = application.solicitar_mensaje()
-                probability = noise.parse_probability(request.probability_text)
-                message_bits = presentation.codificar_mensaje(request.message)
-                frame_bits = link.calcular_integridad(message_bits, request.algorithm)
-                noisy_frame, flips = noise.aplicar_ruido(frame_bits, probability)
-                transport.enviar_informacion(request.algorithm, len(message_bits), noisy_frame)
-                print(
-                    f"[RUIDO] {flips} bit(s) volteado(s) de {len(frame_bits)}; "
-                    f"redundancia={len(frame_bits) - len(message_bits)} bits"
-                )
-            except EOFError:
-                print("[CAJERO] Fin de envio.")
-                try:
-                    sock.shutdown(socket.SHUT_WR)
-                except OSError:
-                    pass
-                receiver.join(timeout=2)
-                return
-            except ValueError as exc:
-                application.mostrar_mensaje(error=str(exc))
-            except OSError as exc:
-                application.mostrar_mensaje(error=f"envio fallido: {exc}")
-                return
+        try:
+            flujo_login(transport)
+            flujo_menu(transport)
+        except (ConnectionError, OSError) as exc:
+            print(f"\n[APLICACION] ERROR: conexion perdida: {exc}")
 
 
 def main() -> None:

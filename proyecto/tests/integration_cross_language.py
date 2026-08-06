@@ -1,4 +1,4 @@
-"""Prueba TCP real en ambos sentidos entre el cliente Python y el servidor Go."""
+"""Prueba TCP real end-to-end: cajero Python contra servidor bancario Go."""
 
 from pathlib import Path
 import os
@@ -13,8 +13,13 @@ PYTHON_SIDE = ROOT / "python-side"
 GO_SIDE = ROOT / "go-side"
 sys.path.insert(0, str(PYTHON_SIDE))
 
-from atm.layers import link, presentation  # noqa: E402
+from atm.layers import application, link, presentation  # noqa: E402
 from atm.layers.transmission import TransmissionLayer  # noqa: E402
+
+CARD = "4111111111111111"
+PIN = "1234"
+OTHER_CARD = "5500005555555559"
+OTHER_PIN = "0000"
 
 
 def free_port() -> int:
@@ -37,69 +42,73 @@ def connect_with_retry(port: int, timeout: float = 15.0) -> socket.socket:
     raise RuntimeError(f"el servidor Go no abrio el puerto {port}: {last_error}")
 
 
+def enviar_comando(transport: TransmissionLayer, algorithm: str, command_text: str) -> application.Respuesta:
+    """Recorre Presentacion/Enlace/Transmision sin ruido y parsea la respuesta real."""
+    message_bits = presentation.codificar_mensaje(command_text)
+    frame_bits = link.calcular_integridad(message_bits, algorithm)
+    transport.enviar_informacion(algorithm, len(message_bits), frame_bits)
+
+    received = transport.recibir_informacion()
+    if received is None:
+        raise AssertionError("el servidor cerro la conexion antes de responder")
+    integrity = link.verificar_integridad(received.frame_bits, received.algorithm, received.message_bit_length)
+    if not integrity.ok:
+        raise AssertionError(f"el cliente rechazo la respuesta: {integrity.error}")
+    text = presentation.decodificar_mensaje(integrity.message_bits)
+    return application.parse_respuesta(text)
+
+
 def run_case(server_binary: Path, algorithm: str) -> None:
-    """Verifica Go->Python y Python->Go con un algoritmo sobre TCP real."""
+    """Recorre login exitoso, retiro exitoso, fondos insuficientes y logout."""
     port = free_port()
-    environment = os.environ.copy()
-    environment["GODEBUG"] = ""
     process = subprocess.Popen(
         [str(server_binary), "--host", "127.0.0.1", "--port", str(port)],
         cwd=GO_SIDE,
-        stdin=subprocess.PIPE,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         encoding="utf-8",
-        env=environment,
     )
-    output = ""
     client: socket.socket | None = None
     try:
         client = connect_with_retry(port)
         transport = TransmissionLayer(client)
 
-        assert process.stdin is not None
-        process.stdin.write(f"DESDE GO\n{algorithm}\n0\n")
-        process.stdin.flush()
+        respuesta = enviar_comando(transport, algorithm, application.comando_login("0000000000000000", "9999"))
+        if respuesta.action != "LOGIN_DENIED":
+            raise AssertionError(f"se esperaba LOGIN_DENIED, se obtuvo: {respuesta}")
 
-        received = transport.recibir_informacion()
-        if received is None:
-            raise AssertionError("Go cerro la conexion antes de enviar")
-        checked = link.verificar_integridad(
-            received.frame_bits, received.algorithm, received.message_bit_length
-        )
-        if not checked.ok:
-            raise AssertionError(f"Python rechazo la trama de Go: {checked.error}")
-        if presentation.decodificar_mensaje(checked.message_bits) != "DESDE GO":
-            raise AssertionError("Python no decodifico el texto enviado por Go")
+        respuesta = enviar_comando(transport, algorithm, application.comando_login(CARD, PIN))
+        if respuesta.action != "LOGIN_OK":
+            raise AssertionError(f"se esperaba LOGIN_OK, se obtuvo: {respuesta}")
 
-        python_bits = presentation.codificar_mensaje("DESDE PYTHON")
-        python_frame = link.calcular_integridad(python_bits, algorithm)
-        transport.enviar_informacion(algorithm, len(python_bits), python_frame)
-        client.shutdown(socket.SHUT_WR)
+        respuesta = enviar_comando(transport, algorithm, application.comando_retiro(1_000_000))
+        if respuesta.action != "WITHDRAW_ERROR":
+            raise AssertionError(f"se esperaba WITHDRAW_ERROR, se obtuvo: {respuesta}")
 
-        deadline = time.monotonic() + 5
-        while time.monotonic() < deadline:
-            time.sleep(0.1)
-            if process.poll() is not None:
-                break
-        process.terminate()
-        output, _ = process.communicate(timeout=5)
-        if "Mensaje recibido" not in output or "DESDE PYTHON" not in output:
-            raise AssertionError(f"Go no mostro el mensaje de Python. Salida:\n{output}")
+        respuesta = enviar_comando(transport, algorithm, application.comando_retiro(50))
+        if respuesta.action != "WITHDRAW_OK" or respuesta.amount != 50.00:
+            raise AssertionError(f"se esperaba WITHDRAW_OK de 50.00, se obtuvo: {respuesta}")
+
+        respuesta = enviar_comando(transport, algorithm, application.comando_logout())
+        if respuesta.action != "LOGOUT_OK":
+            raise AssertionError(f"se esperaba LOGOUT_OK, se obtuvo: {respuesta}")
     finally:
         if client is not None:
             client.close()
         if process.poll() is None:
-            process.kill()
-        if process.stdin and not process.stdin.closed:
-            process.stdin.close()
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
         if process.stdout and not process.stdout.closed:
             process.stdout.close()
 
 
 def run_reaccept_case(server_binary: Path) -> None:
-    """Comprueba que el servidor vuelve a accept despues de una desconexion."""
+    """Comprueba que el servidor acepta clientes sucesivos, cada uno con su sesion."""
     port = free_port()
     process = subprocess.Popen(
         [str(server_binary), "--host", "127.0.0.1", "--port", str(port)],
@@ -112,22 +121,23 @@ def run_reaccept_case(server_binary: Path) -> None:
     )
     output = ""
     try:
-        for index, algorithm in enumerate(("hamming", "crc32"), start=1):
+        for card, pin in ((CARD, PIN), (OTHER_CARD, OTHER_PIN)):
             client = connect_with_retry(port)
             try:
                 transport = TransmissionLayer(client)
-                message_bits = presentation.codificar_mensaje(f"CLIENTE {index}")
-                frame = link.calcular_integridad(message_bits, algorithm)
-                transport.enviar_informacion(algorithm, len(message_bits), frame)
-                client.shutdown(socket.SHUT_WR)
-                time.sleep(0.3)
+                respuesta = enviar_comando(transport, "crc32", application.comando_login(card, pin))
+                if respuesta.action != "LOGIN_OK":
+                    raise AssertionError(f"login fallo para {card}: {respuesta}")
+                respuesta = enviar_comando(transport, "crc32", application.comando_logout())
+                if respuesta.action != "LOGOUT_OK":
+                    raise AssertionError(f"logout fallo para {card}: {respuesta}")
             finally:
                 client.close()
-        time.sleep(0.5)
+        time.sleep(0.3)
         process.terminate()
         output, _ = process.communicate(timeout=5)
-        if "CLIENTE 1" not in output or "CLIENTE 2" not in output:
-            raise AssertionError(f"el servidor no acepto dos conexiones sucesivas. Salida:\n{output}")
+        if output.count("LOGOUT_OK") < 2:
+            raise AssertionError(f"el servidor no atendio dos sesiones sucesivas. Salida:\n{output}")
     finally:
         if process.poll() is None:
             process.kill()
@@ -147,9 +157,9 @@ def main() -> None:
         )
         for algorithm in ("hamming", "crc32"):
             run_case(server_binary, algorithm)
-            print(f"OK interoperabilidad bidireccional: {algorithm}")
+            print(f"OK transaccion completa (login/retiro/logout): {algorithm}")
         run_reaccept_case(server_binary)
-        print("OK servidor en escucha para conexiones sucesivas")
+        print("OK servidor en escucha para sesiones sucesivas")
 
 
 if __name__ == "__main__":

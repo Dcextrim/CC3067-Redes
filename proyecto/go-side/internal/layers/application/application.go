@@ -1,65 +1,62 @@
-// Package application implementa la interfaz de usuario del servidor bancario.
+// Package application interpreta y responde los comandos del cajero: login, retiro y logout.
 package application
 
 import (
-	"bufio"
 	"fmt"
-	"io"
+	"strconv"
 	"strings"
-
-	"cc3067/lab2/go-side/internal/layers/link"
 )
 
-// OutgoingRequest agrupa los valores solicitados antes de recorrer las capas.
-type OutgoingRequest struct {
-	Message         string
-	Algorithm       string
-	ProbabilityText string
+// Request representa un comando de cajero ya separado en campos.
+type Request struct {
+	Action string
+	Card   string
+	Pin    string
+	Amount float64
 }
 
-func readLine(reader *bufio.Reader, writer io.Writer, prompt string) (string, error) {
-	// Reader se inyecta para desacoplar la consola de las pruebas y del transporte.
-	fmt.Fprint(writer, prompt)
-	line, err := reader.ReadString('\n')
-	if err != nil && len(line) == 0 {
-		return "", err
+// ParseRequest interpreta el texto plano recibido de Aplicacion en el cajero.
+func ParseRequest(text string) (Request, error) {
+	parts := strings.Split(text, "|")
+	switch parts[0] {
+	case "LOGIN":
+		if len(parts) != 3 {
+			return Request{}, fmt.Errorf("comando LOGIN invalido")
+		}
+		return Request{Action: "LOGIN", Card: parts[1], Pin: parts[2]}, nil
+	case "WITHDRAW":
+		if len(parts) != 2 {
+			return Request{}, fmt.Errorf("comando WITHDRAW invalido")
+		}
+		amount, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			return Request{}, fmt.Errorf("monto invalido")
+		}
+		return Request{Action: "WITHDRAW", Amount: amount}, nil
+	case "LOGOUT":
+		return Request{Action: "LOGOUT"}, nil
+	default:
+		return Request{}, fmt.Errorf("comando desconocido: %s", parts[0])
 	}
-	return strings.TrimRight(line, "\r\n"), nil
 }
 
-// SolicitarMensaje obtiene texto, algoritmo y tasa sin codificar ni transmitir.
-func SolicitarMensaje(reader *bufio.Reader, writer io.Writer) (OutgoingRequest, error) {
-	message, err := readLine(reader, writer, "Mensaje ASCII (o /salir): ")
-	if err != nil {
-		return OutgoingRequest{}, err
-	}
-	if message == "/salir" {
-		return OutgoingRequest{}, io.EOF
-	}
-	algorithmText, err := readLine(reader, writer, "Algoritmo [1=hamming, 2=crc32]: ")
-	if err != nil {
-		return OutgoingRequest{}, err
-	}
-	algorithm, err := link.NormalizeAlgorithm(algorithmText)
-	if err != nil {
-		return OutgoingRequest{}, err
-	}
-	probability, err := readLine(reader, writer, "Probabilidad de error [decimal o fraccion, ej. 1/100]: ")
-	if err != nil {
-		return OutgoingRequest{}, err
-	}
-	return OutgoingRequest{message, algorithm, probability}, nil
+// Response representa una respuesta automatica ya lista para codificar.
+type Response struct {
+	Action  string
+	Message string
+	Amount  float64
+	Balance float64
 }
 
-// MostrarMensaje presenta una entrega valida o un error de las capas inferiores.
-func MostrarMensaje(message, errorMessage string, corrected bool) {
-	if errorMessage != "" {
-		fmt.Printf("\n[APLICACION] ERROR: %s\n", errorMessage)
-		return
+// Encode produce el texto plano que atraviesa Presentacion.
+func (r Response) Encode() string {
+	if r.Action == "WITHDRAW_OK" {
+		return fmt.Sprintf("WITHDRAW_OK|%.2f|%.2f", r.Amount, r.Balance)
 	}
-	suffix := ""
-	if corrected {
-		suffix = " (Hamming corrigio un bit)"
-	}
-	fmt.Printf("\n[APLICACION] Mensaje recibido%s: %s\n", suffix, message)
+	return fmt.Sprintf("%s|%s", r.Action, r.Message)
+}
+
+// MostrarEvento registra en consola cada peticion atendida automaticamente.
+func MostrarEvento(remote, requestText, responseText string) {
+	fmt.Printf("[APLICACION] %s -> %s | respuesta: %s\n", remote, requestText, responseText)
 }

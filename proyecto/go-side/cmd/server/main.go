@@ -1,14 +1,12 @@
 package main
 
 import (
-	"bufio"
-	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	"cc3067/lab2/go-side/internal/layers/application"
@@ -18,100 +16,112 @@ import (
 	"cc3067/lab2/go-side/internal/layers/transmission"
 )
 
-func receiveLoop(layer *transmission.Layer, done chan<- struct{}) {
-	// Esta goroutine mantiene la recepcion activa mientras la consola envia.
-	defer close(done)
+// account replica el estado hardcodeado del servidor base del laboratorio anterior.
+type account struct {
+	pin     string
+	balance float64
+}
+
+var accounts = map[string]*account{
+	"4111111111111111": {pin: "1234", balance: 500.00},
+	"5500005555555559": {pin: "0000", balance: 1200.50},
+}
+var accountsMutex sync.Mutex
+
+// handleRequest aplica la logica de negocio; es pura para poder probarla sin sockets.
+func handleRequest(request application.Request, authenticatedCard string) (application.Response, string) {
+	switch request.Action {
+	case "LOGIN":
+		accountsMutex.Lock()
+		acc, ok := accounts[request.Card]
+		accountsMutex.Unlock()
+		if ok && acc.pin == request.Pin {
+			return application.Response{Action: "LOGIN_OK", Message: "Autenticacion exitosa"}, request.Card
+		}
+		return application.Response{Action: "LOGIN_DENIED", Message: "Tarjeta o PIN invalidos"}, authenticatedCard
+
+	case "WITHDRAW":
+		if authenticatedCard == "" {
+			return application.Response{Action: "ERROR", Message: "No ha iniciado sesion"}, authenticatedCard
+		}
+		if request.Amount <= 0 {
+			return application.Response{Action: "WITHDRAW_ERROR", Message: "El monto debe ser mayor que cero"}, authenticatedCard
+		}
+		accountsMutex.Lock()
+		defer accountsMutex.Unlock()
+		acc := accounts[authenticatedCard]
+		if request.Amount > acc.balance {
+			return application.Response{Action: "WITHDRAW_ERROR", Message: "Fondos insuficientes"}, authenticatedCard
+		}
+		acc.balance -= request.Amount
+		return application.Response{Action: "WITHDRAW_OK", Amount: request.Amount, Balance: acc.balance}, authenticatedCard
+
+	case "LOGOUT":
+		return application.Response{Action: "LOGOUT_OK", Message: "Hasta luego"}, ""
+
+	default:
+		return application.Response{Action: "ERROR", Message: "Comando desconocido"}, authenticatedCard
+	}
+}
+
+// sendAutoReply codifica y envia una respuesta automatica sin exponerla a ruido.
+func sendAutoReply(layer *transmission.Layer, algorithm string, response application.Response, source *rand.Rand) error {
+	messageBits, err := presentation.CodificarMensaje(response.Encode())
+	if err != nil {
+		return err
+	}
+	frameBits, err := link.CalcularIntegridad(messageBits, algorithm)
+	if err != nil {
+		return err
+	}
+	noisyFrame, _, err := noise.AplicarRuido(frameBits, 0.0, source)
+	if err != nil {
+		return err
+	}
+	return layer.EnviarInformacion(algorithm, len(messageBits), noisyFrame)
+}
+
+// handleConnection atiende una conexion de cajero hasta LOGOUT o desconexion.
+func handleConnection(connection net.Conn) {
+	defer connection.Close()
+	layer := transmission.New(connection)
+	source := rand.New(rand.NewSource(time.Now().UnixNano()))
+	authenticatedCard := ""
+	remote := connection.RemoteAddr().String()
+
 	for {
 		received, err := layer.RecibirInformacion()
 		if err != nil {
-			application.MostrarMensaje("", "recepcion fallida: "+err.Error(), false)
+			fmt.Println("[SERVIDOR] Error de recepcion:", err)
 			return
 		}
 		if received == nil {
-			fmt.Println("\n[TRANSMISION] El cajero cerro la conexion.")
+			fmt.Println("[SERVIDOR] El cajero cerro la conexion:", remote)
 			return
 		}
+
+		var response application.Response
+		requestText := ""
 		integrity := link.VerificarIntegridad(received.FrameBits, received.Algorithm, received.MessageBitLength)
 		if !integrity.OK {
-			application.MostrarMensaje("", integrity.Error, false)
-			continue
+			response = application.Response{Action: "ERROR", Message: "Transmision corrupta, reintente"}
+		} else if text, decodeErr := presentation.DecodificarMensaje(integrity.MessageBits); decodeErr != nil {
+			response = application.Response{Action: "ERROR", Message: "Transmision corrupta, reintente"}
+		} else if request, parseErr := application.ParseRequest(text); parseErr != nil {
+			requestText = text
+			response = application.Response{Action: "ERROR", Message: "Comando invalido"}
+		} else {
+			requestText = text
+			response, authenticatedCard = handleRequest(request, authenticatedCard)
 		}
-		message, err := presentation.DecodificarMensaje(integrity.MessageBits)
-		if err != nil {
-			application.MostrarMensaje("", err.Error(), false)
-			continue
-		}
-		application.MostrarMensaje(message, "", integrity.Corrected)
-	}
-}
+		application.MostrarEvento(remote, requestText, response.Encode())
 
-func sendRequest(layer *transmission.Layer, request application.OutgoingRequest, source *rand.Rand) error {
-	// El orden refleja el recorrido emisor: Presentacion, Enlace, Ruido, Transmision.
-	probability, err := noise.ParseProbability(request.ProbabilityText)
-	if err != nil {
-		return err
-	}
-	messageBits, err := presentation.CodificarMensaje(request.Message)
-	if err != nil {
-		return err
-	}
-	frameBits, err := link.CalcularIntegridad(messageBits, request.Algorithm)
-	if err != nil {
-		return err
-	}
-	noisyFrame, flips, err := noise.AplicarRuido(frameBits, probability, source)
-	if err != nil {
-		return err
-	}
-	if err := layer.EnviarInformacion(request.Algorithm, len(messageBits), noisyFrame); err != nil {
-		return fmt.Errorf("envio fallido: %w", err)
-	}
-	fmt.Printf("[RUIDO] %d bit(s) volteado(s) de %d; redundancia=%d bits\n", flips, len(frameBits), len(frameBits)-len(messageBits))
-	return nil
-}
-
-func consoleLoop(reader *bufio.Reader, requests chan<- application.OutgoingRequest) {
-	// Un canal desacopla el bloqueo de stdin del ciclo que atiende la conexion.
-	defer close(requests)
-	for {
-		request, err := application.SolicitarMensaje(reader, os.Stdout)
-		if err != nil {
-			if err == io.EOF {
-				return
-			}
-			application.MostrarMensaje("", err.Error(), false)
-			continue
-		}
-		requests <- request
-	}
-}
-
-func handleConnection(connection net.Conn, requests <-chan application.OutgoingRequest) {
-	// done permite volver a Accept inmediatamente cuando el cajero se desconecta.
-	defer connection.Close()
-	layer := transmission.New(connection)
-	done := make(chan struct{})
-	go receiveLoop(layer, done)
-	source := rand.New(rand.NewSource(time.Now().UnixNano()))
-	activeRequests := requests
-
-	for {
-		// Se atienden eventos de red y solicitudes locales sin bloquear uno al otro.
-		select {
-		case <-done:
+		if err := sendAutoReply(layer, received.Algorithm, response, source); err != nil {
+			fmt.Println("[SERVIDOR] Error de envio:", err)
 			return
-		case request, ok := <-activeRequests:
-			if !ok {
-				activeRequests = nil
-				continue
-			}
-			if err := sendRequest(layer, request, source); err != nil {
-				application.MostrarMensaje("", err.Error(), false)
-				var networkError *net.OpError
-				if errors.As(err, &networkError) {
-					return
-				}
-			}
+		}
+		if response.Action == "LOGOUT_OK" {
+			return
 		}
 	}
 }
@@ -128,9 +138,6 @@ func main() {
 	}
 	defer listener.Close()
 	fmt.Printf("[SERVIDOR] Escuchando en %s:%d\n", *host, *port)
-	// La consola se crea una sola vez y puede alimentar conexiones sucesivas.
-	requests := make(chan application.OutgoingRequest)
-	go consoleLoop(bufio.NewReader(os.Stdin), requests)
 	for {
 		connection, err := listener.Accept()
 		if err != nil {
@@ -138,6 +145,6 @@ func main() {
 			continue
 		}
 		fmt.Println("[SERVIDOR] Conexion de", connection.RemoteAddr())
-		handleConnection(connection, requests)
+		go handleConnection(connection)
 	}
 }
