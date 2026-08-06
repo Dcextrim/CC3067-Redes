@@ -14,7 +14,7 @@ ocho, los bits finales del ultimo octeto se rellenan con ceros y se descartan al
 
 ## Encabezado de Transmision (16 octetos)
 
-| Offset | Tamano | Campo | Valor |
+| Offset | Tamaño | Campo | Valor |
 |---:|---:|---|---|
 | 0 | 4 | magic | ASCII `CC67` (`43 43 36 37`) |
 | 4 | 1 | version | `01` |
