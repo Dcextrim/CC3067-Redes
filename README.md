@@ -3,7 +3,7 @@
 Simulador de comunicacion entre un cajero automatico y un servidor bancario sobre un canal
 no confiable, con deteccion y correccion de errores a nivel de bits.
 
-Este repositorio tiene dos carpetas de nivel superior:
+Este repositorio tiene dos carpetas principales:
 
 - [`informe/`](informe/) - el reporte final en PDF con resultados y discusion.
 - [`proyecto/`](proyecto/) - todo el codigo (cajero en Python, servidor en Go, pruebas,
