@@ -1,12 +1,13 @@
-# Laboratorio 2 - Esquemas de deteccion y correccion de errores
+# Cajero-Banco: mensajeria resiliente a errores
 
-Implementacion de CC3067 (UVG) con cajero en Python y servidor bancario en Go. Los dos extremos
-pueden enviar y recibir mensajes ASCII, elegir Hamming o CRC-32 y especificar una probabilidad de
-flip distinta en cada envio.
+Simulacion de un cajero automatico (Python) y un servidor bancario (Go) que intercambian
+mensajes ASCII por TCP a traves de un canal no confiable. Ambos extremos pueden enviar y
+recibir, elegir entre Hamming o CRC-32 para verificar la integridad, y especificar una
+probabilidad de bit flip distinta en cada envio.
 
-Los archivos `client.py` y `server.py` de la raiz son el material base del laboratorio anterior y
-se conservaron sin cambios. La implementacion nueva esta separada por capas en `python-side/` y
-`go-side/`.
+Los archivos `legacy/client.py` y `legacy/server.py` son un cliente/servidor base anterior,
+sin capas ni deteccion de errores, conservados sin cambios como referencia. La implementacion
+nueva esta separada por capas en `python-side/` y `go-side/`.
 
 ## Estructura
 
@@ -18,6 +19,7 @@ docs/protocol.md          framing y convenciones bit a bit
 scripts/                  experimentos y automatizacion de pruebas
 data/                     resultados CSV reproducibles
 figures/                  graficas generadas
+legacy/                   cliente/servidor base sin capas, como referencia
 ```
 
 ## Ejecucion interactiva
