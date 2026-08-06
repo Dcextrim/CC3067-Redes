@@ -1,6 +1,6 @@
 # CC3067 - Laboratorio 2: Esquemas de deteccion y correccion de errores
 
-Este repositorio tiene dos carpetas de nivel superior:
+Este repositorio tiene dos carpetas principales:
 
 - [`informe/`](informe/) - el reporte final en PDF, la entrega principal.
 - [`proyecto/`](proyecto/) - todo el codigo (cajero en Python, servidor en Go, pruebas,
