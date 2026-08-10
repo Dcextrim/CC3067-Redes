@@ -1,0 +1,12 @@
+{
+  "FA-330": {
+    "cantidad": 4,
+    "bodega": "Principal",
+    "ultima_actualizacion": "2026-08-20"
+  },
+  "FS-10": {
+    "cantidad": 0,
+    "bodega": "Principal",
+    "fecha_reabastecimiento": "2026-08-25"
+  }
+}

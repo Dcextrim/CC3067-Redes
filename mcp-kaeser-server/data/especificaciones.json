@@ -1,0 +1,372 @@
+{
+  "ASK 28": {
+    "familia": "ASK",
+    "configuracion": "Standard",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 2.86,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 15.0,
+    "dimensiones_mm": "800x1110x1530",
+    "fuente": "KAESER Technical specifications"
+  },
+  "ASK 34": {
+    "familia": "ASK",
+    "configuracion": "Standard",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 3.51,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 18.5,
+    "dimensiones_mm": "800x1110x1530",
+    "fuente": "KAESER Technical specifications"
+  },
+  "ASK 40": {
+    "familia": "ASK",
+    "configuracion": "Standard",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 4.06,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 22.0,
+    "dimensiones_mm": "800x1110x1530",
+    "fuente": "KAESER Technical specifications"
+  },
+  "ASK 28 T": {
+    "familia": "ASK",
+    "configuracion": "Dryer",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 2.86,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 15.0,
+    "dimensiones_mm": "800x1460x1530",
+    "fuente": "KAESER Technical specifications"
+  },
+  "ASK 34 T": {
+    "familia": "ASK",
+    "configuracion": "Dryer",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 3.51,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 18.5,
+    "dimensiones_mm": "800x1460x1530",
+    "fuente": "KAESER Technical specifications"
+  },
+  "ASK 40 T": {
+    "familia": "ASK",
+    "configuracion": "Dryer",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 4.06,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 22.0,
+    "dimensiones_mm": "800x1460x1530",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SK 22": {
+    "familia": "SK",
+    "configuracion": "Standard",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 2.02,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 11.0,
+    "dimensiones_mm": "750x895x1260",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SK 25": {
+    "familia": "SK",
+    "configuracion": "Standard",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 2.52,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 15.0,
+    "dimensiones_mm": "750x895x1260",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SK 22 T": {
+    "familia": "SK",
+    "configuracion": "Dryer",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 2.02,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 11.0,
+    "dimensiones_mm": "750x1240x1260",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SK 25 T": {
+    "familia": "SK",
+    "configuracion": "Dryer",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 2.52,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 15.0,
+    "dimensiones_mm": "750x1240x1260",
+    "fuente": "KAESER Technical specifications"
+  },
+  "AIRCENTER 22": {
+    "familia": "SK",
+    "configuracion": "Aircenter",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 2.02,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 11.0,
+    "dimensiones_mm": "750x1335x1880",
+    "fuente": "KAESER Technical specifications"
+  },
+  "AIRCENTER 25": {
+    "familia": "SK",
+    "configuracion": "Aircenter",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 2.52,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 15.0,
+    "dimensiones_mm": "750x1335x1880",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SM 10": {
+    "familia": "SM",
+    "configuracion": "Standard",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.94,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 5.5,
+    "dimensiones_mm": "630x790x1100",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SM 13": {
+    "familia": "SM",
+    "configuracion": "Standard",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 1.32,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 7.5,
+    "dimensiones_mm": "630x790x1100",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SM 16": {
+    "familia": "SM",
+    "configuracion": "Standard",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 1.62,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 9.0,
+    "dimensiones_mm": "630x790x1100",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SM 10 T": {
+    "familia": "SM",
+    "configuracion": "Dryer",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.94,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 5.5,
+    "dimensiones_mm": "630x1090x1100",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SM 13 T": {
+    "familia": "SM",
+    "configuracion": "Dryer",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 1.32,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 7.5,
+    "dimensiones_mm": "630x1090x1100",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SM 16 T": {
+    "familia": "SM",
+    "configuracion": "Dryer",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 1.62,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 9.0,
+    "dimensiones_mm": "630x1090x1100",
+    "fuente": "KAESER Technical specifications"
+  },
+  "AIRCENTER 10": {
+    "familia": "SM",
+    "configuracion": "Aircenter",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.94,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 5.5,
+    "dimensiones_mm": "630x1220x1720",
+    "fuente": "KAESER Technical specifications"
+  },
+  "AIRCENTER 13": {
+    "familia": "SM",
+    "configuracion": "Aircenter",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 1.32,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 7.5,
+    "dimensiones_mm": "630x1220x1720",
+    "fuente": "KAESER Technical specifications"
+  },
+  "AIRCENTER 16": {
+    "familia": "SM",
+    "configuracion": "Aircenter",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 1.62,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 9.0,
+    "dimensiones_mm": "630x1220x1720",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SX 3": {
+    "familia": "SX",
+    "configuracion": "Standard",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.34,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 2.2,
+    "dimensiones_mm": "590x632x970",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SX 4": {
+    "familia": "SX",
+    "configuracion": "Standard",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.45,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 3.0,
+    "dimensiones_mm": "590x632x970",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SX 6": {
+    "familia": "SX",
+    "configuracion": "Standard",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.60,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 4.0,
+    "dimensiones_mm": "590x632x970",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SX 8": {
+    "familia": "SX",
+    "configuracion": "Standard",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.80,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 5.5,
+    "dimensiones_mm": "590x632x970",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SX 3 T": {
+    "familia": "SX",
+    "configuracion": "Dryer",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.34,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 2.2,
+    "dimensiones_mm": "590x905x970",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SX 4 T": {
+    "familia": "SX",
+    "configuracion": "Dryer",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.45,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 3.0,
+    "dimensiones_mm": "590x905x970",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SX 6 T": {
+    "familia": "SX",
+    "configuracion": "Dryer",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.60,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 4.0,
+    "dimensiones_mm": "590x905x970",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SX 8 T": {
+    "familia": "SX",
+    "configuracion": "Dryer",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.80,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 5.5,
+    "dimensiones_mm": "590x905x970",
+    "fuente": "KAESER Technical specifications"
+  },
+  "AIRCENTER 3": {
+    "familia": "SX",
+    "configuracion": "Aircenter",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.34,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 2.2,
+    "dimensiones_mm": "590x1090x1560",
+    "fuente": "KAESER Technical specifications"
+  },
+  "AIRCENTER 4": {
+    "familia": "SX",
+    "configuracion": "Aircenter",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.45,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 3.0,
+    "dimensiones_mm": "590x1090x1560",
+    "fuente": "KAESER Technical specifications"
+  },
+  "AIRCENTER 6": {
+    "familia": "SX",
+    "configuracion": "Aircenter",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.60,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 4.0,
+    "dimensiones_mm": "590x1090x1560",
+    "fuente": "KAESER Technical specifications"
+  },
+  "AIRCENTER 8": {
+    "familia": "SX",
+    "configuracion": "Aircenter",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.80,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 5.5,
+    "dimensiones_mm": "590x1090x1560",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SXC 3": {
+    "familia": "SXC",
+    "configuracion": "All-in-one",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.34,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 2.2,
+    "dimensiones_mm": "620x980x1480",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SXC 4": {
+    "familia": "SXC",
+    "configuracion": "All-in-one",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.45,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 3.0,
+    "dimensiones_mm": "620x980x1480",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SXC 6": {
+    "familia": "SXC",
+    "configuracion": "All-in-one",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.60,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 4.0,
+    "dimensiones_mm": "620x980x1480",
+    "fuente": "KAESER Technical specifications"
+  },
+  "SXC 8": {
+    "familia": "SXC",
+    "configuracion": "All-in-one",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": 0.80,
+    "presion_max_bar": 8.0,
+    "potencia_kw": 5.5,
+    "dimensiones_mm": "620x980x1480",
+    "fuente": "KAESER Technical specifications"
+  }
+}

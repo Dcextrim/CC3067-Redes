@@ -1,0 +1,110 @@
+{
+  "0001 A": {
+    "tipo": "Alarma",
+    "descripcion": "Direction of rotation",
+    "causas_probables": [
+      "Motor del compresor girando en dirección incorrecta."
+    ],
+    "acciones": [
+      "Invertir las líneas de suministro L1 y L2."
+    ],
+    "requiere_servicio_autorizado": false,
+    "fuente": "SIGMA CONTROL 2 Manual"
+  },
+  "0002 A": {
+    "tipo": "Alarma",
+    "descripcion": "Motor temperature ⇞",
+    "causas_probables": [
+      "Motor del compresor demasiado caliente."
+    ],
+    "acciones": [
+      "Mantener las condiciones ambientales dentro de los límites especificados.",
+      "Comprobar el suministro de aire de refrigeración.",
+      "Limpiar el motor."
+    ],
+    "requiere_servicio_autorizado": false,
+    "fuente": "SIGMA CONTROL 2 Manual"
+  },
+  "0004 A": {
+    "tipo": "Alarma",
+    "descripcion": "EMERGENCY STOP",
+    "causas_probables": [
+      "Botón de parada de emergencia presionado."
+    ],
+    "acciones": [
+      "Desbloquear el botón de parada de emergencia."
+    ],
+    "requiere_servicio_autorizado": false,
+    "fuente": "SIGMA CONTROL 2 Manual"
+  },
+  "0064 A": {
+    "tipo": "Alarma",
+    "descripcion": "Refrigeration dryer compressor motor temperature ⇞",
+    "causas_probables": [
+      "Temperaturas ambientales permitidas excedidas.",
+      "Refrigeración del condensador insuficiente.",
+      "Temperatura de entrada del aire comprimido demasiado alta.",
+      "Nivel bajo de refrigerante."
+    ],
+    "acciones": [
+      "Comprobar y reducir las temperaturas ambientales.",
+      "Limpiar el condensador.",
+      "Comprobar el ventilador.",
+      "Comprobar la refrigeración del aire comprimido en el compresor.",
+      "Limpiar el enfriador del compresor.",
+      "Contactar a un representante de servicio autorizado de KAESER."
+    ],
+    "requiere_servicio_autorizado": true,
+    "fuente": "SIGMA CONTROL 2 Manual"
+  },
+  "0200 A": {
+    "tipo": "Alarma",
+    "descripcion": "Compressor motor USS alarm",
+    "causas_probables": [
+      "Fallo del convertidor de frecuencia."
+    ],
+    "acciones": [
+      "Contactar a un representante de servicio autorizado de KAESER."
+    ],
+    "requiere_servicio_autorizado": true,
+    "fuente": "SIGMA CONTROL 2 Manual"
+  },
+  "0002 W": {
+    "tipo": "Advertencia",
+    "descripcion": "Motor temperature ↑",
+    "causas_probables": [
+      "Motor del compresor caliente."
+    ],
+    "acciones": [
+      "Mantener las condiciones ambientales dentro de los límites especificados.",
+      "Comprobar el suministro de aire de refrigeración.",
+      "Limpiar el motor."
+    ],
+    "requiere_servicio_autorizado": false,
+    "fuente": "SIGMA CONTROL 2 Manual"
+  },
+  "0003 W": {
+    "tipo": "Advertencia",
+    "descripcion": "Air filter Δp ↑ -Change prefilter!",
+    "causas_probables": [
+      "Prefiltro obstruido."
+    ],
+    "acciones": [
+      "Reemplazar el prefiltro lo antes posible."
+    ],
+    "requiere_servicio_autorizado": false,
+    "fuente": "SIGMA CONTROL 2 Manual"
+  },
+  "0024 W": {
+    "tipo": "Advertencia",
+    "descripcion": "Mains contactor operations ⇞",
+    "causas_probables": [
+      "Número máximo permitido de ciclos de conmutación excedido."
+    ],
+    "acciones": [
+      "Coordinar el reemplazo del contactor principal por un representante de servicio autorizado de KAESER."
+    ],
+    "requiere_servicio_autorizado": true,
+    "fuente": "SIGMA CONTROL 2 Manual"
+  }
+}
