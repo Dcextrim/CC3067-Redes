@@ -1,121 +1,160 @@
-# Protocolo binario CC67 v1
+# Protocolo Link State — CC3067 Lab 3
 
-## Decisiones de diseño
+Este documento formaliza el protocolo implementado por `python-side/router` y
+`go-side/internal/router`. Debe acordarse **sin cambios** con las demas
+parejas de la topologia (interoperabilidad exigida por el enunciado, seccion
+3.3): cualquier modificacion aqui rompe la compatibilidad con los routers de
+otros grupos.
 
-TCP entrega un flujo de octetos, no mensajes. Por ello, cada envio usa un encabezado fijo de
-Transmision y un cuerpo de longitud explicita. El simulador de ruido se aplica antes de
-Transmision, exclusivamente a la trama que Enlace entrega (datos y redundancia). El encabezado
-no pertenece a esa trama y no recibe ruido; de otro modo, un flip en la longitud impediria
-delimitar la siguiente trama.
+## 1. Parametros generales
 
-Todos los enteros multiocteto usan orden de red (big-endian). No se envia texto `0`/`1`: el
-cuerpo se empaqueta en octetos, con el primer bit en el MSB. Si la longitud no es multiplo de
-ocho, los bits finales del ultimo octeto se rellenan con ceros y se descartan al recibir.
+| Campo | Valor |
+|---|---|
+| Transporte | TCP, una conexion corta por mensaje (conectar, enviar una linea, cerrar) |
+| Formato | JSON serializado, UTF-8 |
+| Delimitador | `\n` al final de cada mensaje |
+| Campo clave | `"type"` obligatorio en todo mensaje: `HELLO`, `LSA`, `DATA` |
+| **Identificador de nodo** | `ip:puerto` (ver seccion 2) |
 
-## Encabezado de Transmision (16 octetos)
+### Por que `ip:puerto` y no solo IP
 
-| Offset | Tamaño | Campo | Valor |
-|---:|---:|---|---|
-| 0 | 4 | magic | ASCII `CC67` (`43 43 36 37`) |
-| 4 | 1 | version | `01` |
-| 5 | 1 | algorithm | `01` Hamming, `02` CRC-32 |
-| 6 | 2 | flags | reservado, debe ser `0000` |
-| 8 | 4 | message_bit_length | bits originales, sin redundancia |
-| 12 | 4 | frame_bit_length | bits en el cuerpo, con redundancia |
+La propuesta original identificaba nodos solo por IP de Tailscale. Eso
+funciona en la fase de red real (cada nodo tiene una IP de Tailscale unica),
+pero **rompe la fase de pruebas locales** que exige el enunciado ("nuestro
+medio de desarrollo sera nuestra computadora local"): en `127.0.0.1` todos
+los nodos comparten la misma IP y solo se distinguen por el puerto. Por eso
+el identificador canonico de cualquier nodo (router u host adjunto) es
+`f"{ip}:{port}"`, tanto en pruebas locales como en Tailscale (donde sigue
+siendo unico trivialmente, ya que ahi la IP sola ya lo era).
 
-Inmediatamente despues se envian `ceil(frame_bit_length / 8)` octetos.
+## 2. Configuracion de nodo (`config.json`)
 
-## Presentacion
-
-Cada caracter debe pertenecer a ASCII (0 a 127) y se codifica en ocho bits, MSB primero. Por
-ejemplo, `A` se convierte en `01000001`. El receptor rechaza longitudes que no sean multiplos de
-ocho y valores que no formen ASCII valido.
-
-## Hamming generico SEC
-
-Para `m` bits se elige el menor `r` que cumple `m + r + 1 <= 2^r`. Las posiciones de la palabra
-codificada se numeran desde 1, de izquierda a derecha. Las potencias de dos (`1, 2, 4, ...`) son
-bits de paridad par; las demas contienen los datos en orden. Enlace envia directamente los
-`m + r` bits Hamming. El sindrome identifica y corrige cualquier error de exactamente un bit.
-
-Caso verificable a mano, Hamming(7,4):
-
-```text
-datos:       1 0 1 1
-posiciones:  1 2 3 4 5 6 7
-contenido:  p1 p2 1 p4 0 1 1
-p1 cubre 1,3,5,7 -> p1=0
-p2 cubre 2,3,6,7 -> p2=1
-p4 cubre 4,5,6,7 -> p4=0
-trama:       0 1 1 0 0 1 1
+```json
+{
+  "name": "A",
+  "ip": "100.x.x.x",
+  "port": 5000,
+  "neighbors": [
+    { "ip": "100.y.y.y", "port": 5001, "cost": 2 },
+    { "ip": "100.z.z.z", "port": 5002, "cost": 5 }
+  ],
+  "attached_host": { "role": "client", "ip": "100.w.w.w", "port": 6000, "cost": 1 }
+}
 ```
 
-Si se altera la posicion 5, el sindrome es `101b = 5`; al voltearla se recupera `1011`.
-Hamming SEC no garantiza detectar dos o mas flips dentro de una misma palabra: puede producir
-una correccion equivocada. Esa limitacion se mide como corrupcion silenciosa en los experimentos.
+`attached_host` es opcional: identifica al cliente o servidor (no-router)
+que usa a este nodo como puerta de enlace predeterminada (seccion 3.2 del
+enunciado). El host adjunto se agrega como un vecino mas al grafo de
+enrutamiento (con el costo indicado, 1 por defecto) — exactamente igual a
+como aparece un router vecino.
 
-## CRC-32
+## 3. Tipos de mensaje
 
-Se implementa CRC-32/ISO-HDLC con la forma reflejada del polinomio IEEE
-`0xEDB88320` (forma normal `0x04C11DB7`), valor inicial `0xFFFFFFFF` y XOR final
-`0xFFFFFFFF`. Los datos se empaquetan MSB primero en octetos; el bucle reflejado procesa cada
-octeto con el bit menos significativo primero. Si `n <= 32`, se agregan ceros a la derecha hasta
-32 bits solo para calcular el CRC. Para `n > 32` no multiplo de ocho, se completa el ultimo
-octeto con ceros solo durante el calculo. La longitud original no cambia.
+### A. HELLO (control)
 
-El checksum se serializa como 32 bits, MSB primero, y se concatena al mensaje:
+Enviado a todos los vecinos configurados. Confirma que el vecino esta vivo;
+no requiere respuesta explicita. Cadencia: cada 10s, primer envio inmediato.
 
-```text
-trama_enlace = message_bits || crc_bits
+```json
+{ "type": "HELLO", "from": "100.x.x.x:5000" }
 ```
 
-Vector de control: ASCII `123456789` produce `0xCBF43926`, es decir,
-`11001011111101000011100100100110`. Un mensaje de un bit `1` se completa como
-`80 00 00 00` y produce `0xCC1D6927`.
+### B. LSA — Link State Advertisement (control)
 
-El receptor separa los ultimos 32 bits, recalcula el checksum sobre los primeros
-`message_bit_length` bits y compara. Si difieren, informa el error a Aplicacion y no decodifica.
+Se construye 5s despues de recibir el primer HELLO de un vecino, y se
+inunda a toda la red por flooding.
 
-## Aplicacion
-
-El contenido que atraviesa Presentacion es texto ASCII plano, separado por `|`. El cajero
-inicia cada peticion pidiendo algoritmo y tasa de ruido; el banco responde de forma automatica
-por el mismo pipeline, con probabilidad de ruido fija en `0.0` (no hay una consola pidiendole
-una tasa a un humano en el banco).
-
-Peticiones (cajero -> banco):
-
-```text
-LOGIN|<tarjeta>|<pin>
-WITHDRAW|<monto>          ; formato "%.2f"
-LOGOUT
+```json
+{
+  "type": "LSA",
+  "origin": "100.x.x.x:5000",
+  "seq": 3,
+  "links": { "100.y.y.y:5001": 2, "100.z.z.z:5002": 5 },
+  "from": "100.x.x.x:5000"
+}
 ```
 
-Respuestas (banco -> cajero):
+- `origin`: nodo que genero el LSA. No cambia en ningun salto.
+- `from`: nodo que reenvia. Se actualiza en cada salto a la IP:puerto propios.
+- `links`: vecinos activos (que respondieron HELLO) + host adjunto si existe.
 
-```text
-LOGIN_OK|<mensaje>
-LOGIN_DENIED|<mensaje>
-WITHDRAW_OK|<monto>|<saldo>
-WITHDRAW_ERROR|<mensaje>
-LOGOUT_OK|<mensaje>
-ERROR|<mensaje>            ; no autenticado, comando invalido, o trama corrupta detectada en Enlace
+**Reglas de flooding:**
+1. Mantener el conjunto de pares `(origin, seq)` ya procesados.
+2. Si `(origin, seq)` es nuevo: guardar `links` en el grafo local y reenviar
+   a todos los vecinos **excepto** al que lo envio (campo `from` recibido).
+3. Antes de reenviar, actualizar `from` a la identidad propia.
+4. Si ya se vio: descartar en silencio.
+5. `seq` solo se incrementa al generar un LSA propio, nunca al reenviar.
+
+### C. DATA (datos)
+
+Transporta `{from, to, msg}` protegido con **Hamming(7,4) sobre el frame
+completo**, no solo sobre `msg`. Este es el punto que se corrigio respecto
+a la propuesta original tras aclaracion del profesor: los routers
+intermedios *deben* corregir errores sobre todos los bits recibidos antes
+de poder leer nada (asi lo exige Hamming, que opera sobre el bloque
+completo) — pero solo **leen** el campo `to` para decidir el siguiente
+salto; nunca interpretan ni actuan sobre `msg`. Unicamente el destino
+final usa el contenido de `msg`.
+
+```json
+{ "type": "DATA", "len": 128, "bits": "0110011010..." }
 ```
 
-Si Enlace rechaza la peticion (`ok=false`), el banco nunca ejecuta la accion y aun asi puede
-responder `ERROR|Transmision corrupta, reintente`, porque el encabezado de Transmision -- que
-lleva el algoritmo -- nunca recibe ruido. El cajero sabe entonces que reintentar es seguro. Si en
-cambio la respuesta es la que llega corrupta, el resultado queda ambiguo y el cajero no reintenta
-solo; se lo informa al usuario.
+- `bits`: `Hamming7_4( UTF8_bits( json.dumps({"from","to","msg"}) ) )`
+- `len`: longitud en bits del frame *sin* redundancia (necesaria para que
+  Hamming sepa cuantos bits de paridad esperar al decodificar).
 
-## Flujo por capas
+**Pipeline en cada router al recibir DATA** (igual al enunciado, seccion 3.2):
 
-```text
-Aplicacion -> Presentacion -> Enlace -> Ruido -> Transmision -> TCP
-TCP -> Transmision -> Enlace -> Presentacion -> Aplicacion
+1. Recibir la cadena de bits (`bits`).
+2. Corregir errores sobre **todos** los bits (Hamming, usando `len`).
+3. Extraer los bits de datos ya corregidos.
+4. Deserializar el JSON resultante y leer **solo** el campo `to`.
+5. Consultar `<nodo>_tabla_enrutamiento.csv` con ese valor.
+6. Obtener IP y puerto del siguiente salto.
+7. Re-serializar el mismo frame (sin tocar `msg`).
+8. Aplicar Hamming(7,4) de nuevo sobre el frame completo (nueva `bits`).
+9. Enviar por un socket TCP nuevo hacia el siguiente salto.
+
+El re-empaquetado en los pasos 7-8 importa: si Hamming corrigio un bit en
+el paso 2, el frame reenviado queda "limpio" en vez de arrastrar errores
+previos — cada enlace obtiene su propia proteccion Hamming fresca.
+
+Hamming y LSA/HELLO **no** comparten tratamiento: HELLO y LSA viajan en
+texto plano JSON; Hamming se aplica unicamente al plano de datos (DATA).
+
+## 4. Tabla de ruteo generada
+
+`<nombre_nodo>_tabla_enrutamiento.csv`, escrita por el plano de control una
+vez transcurrida la espera de convergencia:
+
+```csv
+destination,next_hop_ip,next_hop_port,cost
+100.y.y.y:5001,100.y.y.y,5001,2
+100.z.z.z:5002,100.y.y.y,5001,7
 ```
 
-El cajero Python inicia la conexion y ejecuta ambos flujos de forma sincrona: manda una peticion
-y bloquea hasta recibir la respuesta antes de continuar. El servidor Go permanece escuchando y
-atiende cada conexion en su propia goroutine, ejecutando el flujo receptor sobre la peticion y el
-flujo emisor sobre la respuesta automatica, sin intervencion interactiva de un humano.
+`destination` es el identificador `ip:puerto` del nodo (router u host
+adjunto); `next_hop_ip`/`next_hop_port` son la direccion real de socket del
+primer salto (siempre un vecino directo).
+
+## 5. Tiempos y comportamiento
+
+| Evento | Regla |
+|---|---|
+| HELLO | Cada 10s. Primer envio inmediato al iniciar el nodo. |
+| LSA | Generar y floodear 5s despues del primer HELLO recibido. |
+| Convergencia | Esperar 30s antes de asumir que la tabla de ruteo es estable. |
+| Hamming | Solo en plano de datos (DATA). HELLO y LSA van en texto plano. |
+| Hilos | El nodo corre routing (control) y forwarding (datos) en hilos/goroutines separados, comunicados por colas internas; un tercer hilo de escucha acepta conexiones TCP y despacha cada mensaje a la cola que corresponda segun su `"type"`. |
+
+## 6. Puertos
+
+**Pendiente de fijar** hasta confirmar el numero final de nodos de la
+topologia (ver nota del equipo sobre parejas incompletas). Cada nodo
+(router u host) usa un puerto TCP propio — indispensable en la fase de
+pruebas locales, donde todos comparten `127.0.0.1`. En Tailscale cada nodo
+tiene ademas una IP unica, por lo que los puertos podrian repetirse entre
+nodos sin ambiguedad, pero se recomienda mantener la asignacion 1 puerto
+por nodo para no tener que branchear logica entre las dos fases de prueba.
