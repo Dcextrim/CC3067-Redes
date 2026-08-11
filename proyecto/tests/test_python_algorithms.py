@@ -11,14 +11,14 @@ from router.algorithms import dijkstra, hamming, noise  # noqa: E402
 
 
 class HammingTests(unittest.TestCase):
-    """Vectores manuales, longitudes genericas y correccion de un bit."""
+    """Vectores manuales, longitudes genericas y correccion de un bit por bloque."""
 
     def test_manual_hamming_7_4_vector(self):
         self.assertEqual(hamming.required_parity_bits(4), 3)
         self.assertEqual(hamming.encode("1011"), "0110011")
 
-    def test_every_single_bit_error_is_corrected(self):
-        message = "10110010"
+    def test_every_single_bit_error_is_corrected_within_one_block(self):
+        message = "1011"  # un solo bloque de 4 bits
         encoded = hamming.encode(message)
         for index in range(len(encoded)):
             corrupted = list(encoded)
@@ -29,12 +29,26 @@ class HammingTests(unittest.TestCase):
             self.assertEqual(result.syndrome, index + 1)
             self.assertEqual(result.data_bits, message)
 
+    def test_one_error_per_block_is_independently_corrected(self):
+        # Un SEC generico sobre todo el frame solo tolera UN bit volteado en
+        # todo el mensaje; por bloques, cada bloque de 7 tolera el suyo.
+        message = "10110010"  # dos bloques de 4 bits
+        encoded = hamming.encode(message)
+        corrupted = list(encoded)
+        corrupted[2] = "1" if corrupted[2] == "0" else "0"  # bloque 0
+        corrupted[9] = "1" if corrupted[9] == "0" else "0"  # bloque 1
+        result = hamming.decode("".join(corrupted), len(message))
+        self.assertTrue(result.valid)
+        self.assertTrue(result.corrected)
+        self.assertEqual(result.data_bits, message)
+
     def test_generic_lengths_round_trip(self):
         source = random.Random(3067)
         for length in (1, 2, 4, 8, 31, 32, 1000):
             message = "".join(source.choice("01") for _ in range(length))
             encoded = hamming.encode(message)
-            self.assertEqual(len(encoded), length + hamming.required_parity_bits(length))
+            blocks = -(-length // hamming.BLOCK_DATA_BITS) if length else 0
+            self.assertEqual(len(encoded), blocks * hamming.BLOCK_CODE_BITS)
             self.assertEqual(hamming.decode(encoded, length).data_bits, message)
 
 

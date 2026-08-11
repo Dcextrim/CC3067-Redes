@@ -92,18 +92,26 @@ Transporta `{from, to, msg}` protegido con **Hamming(7,4) sobre el frame
 completo**, no solo sobre `msg`. Este es el punto que se corrigio respecto
 a la propuesta original tras aclaracion del profesor: los routers
 intermedios *deben* corregir errores sobre todos los bits recibidos antes
-de poder leer nada (asi lo exige Hamming, que opera sobre el bloque
-completo) — pero solo **leen** el campo `to` para decidir el siguiente
-salto; nunca interpretan ni actuan sobre `msg`. Unicamente el destino
-final usa el contenido de `msg`.
+de poder leer nada — pero solo **leen** el campo `to` para decidir el
+siguiente salto; nunca interpretan ni actuan sobre `msg`. Unicamente el
+destino final usa el contenido de `msg`.
+
+Hamming(7,4) es un codigo **por bloques**: el frame completo se parte en
+bloques de 4 bits de datos, cada uno se codifica a 7 bits (4 datos + 3
+paridad), y el ultimo bloque se rellena con ceros si el frame no es
+multiplo de 4 (el relleno se descarta al decodificar usando `len`). Esto
+corrige **hasta un error de un bit por cada bloque de 7** — a diferencia de
+un unico codigo Hamming generico sobre todo el frame, que solo tolera un
+bit volteado en todo el mensaje sin importar su longitud.
 
 ```json
 { "type": "DATA", "len": 128, "bits": "0110011010..." }
 ```
 
-- `bits`: `Hamming7_4( UTF8_bits( json.dumps({"from","to","msg"}) ) )`
-- `len`: longitud en bits del frame *sin* redundancia (necesaria para que
-  Hamming sepa cuantos bits de paridad esperar al decodificar).
+- `bits`: `Hamming7_4( UTF8_bits( json.dumps({"from","to","msg"}) ) )`, con el
+  frame partido en bloques de 4 bits antes de codificar cada uno a 7.
+- `len`: longitud en bits del frame *sin* redundancia ni relleno (necesaria
+  para que Hamming sepa cuantos bloques esperar al decodificar).
 
 **Pipeline en cada router al recibir DATA** (igual al enunciado, seccion 3.2):
 

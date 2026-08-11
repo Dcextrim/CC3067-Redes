@@ -15,8 +15,8 @@ func TestHammingManualVector(t *testing.T) {
 	}
 }
 
-func TestHammingCorrectsEverySingleBit(t *testing.T) {
-	message := "10110010"
+func TestHammingCorrectsEverySingleBitWithinOneBlock(t *testing.T) {
+	message := "1011" // un solo bloque de 4 bits
 	encoded, _ := HammingEncode(message)
 	for index := range encoded {
 		corrupted := []byte(encoded)
@@ -32,14 +32,35 @@ func TestHammingCorrectsEverySingleBit(t *testing.T) {
 	}
 }
 
+func TestHammingOneErrorPerBlockIsIndependentlyCorrected(t *testing.T) {
+	// Un SEC generico sobre todo el frame solo tolera UN bit volteado en
+	// todo el mensaje; por bloques, cada bloque de 7 tolera el suyo.
+	message := "10110010" // dos bloques de 4 bits
+	encoded, _ := HammingEncode(message)
+	corrupted := []byte(encoded)
+	corrupted[2] = flip(corrupted[2]) // bloque 0
+	corrupted[9] = flip(corrupted[9]) // bloque 1
+	result := HammingDecode(string(corrupted), len(message))
+	if !result.Valid || !result.Corrected || result.DataBits != message {
+		t.Fatalf("fallo al corregir errores independientes por bloque: %+v", result)
+	}
+}
+
+func flip(bit byte) byte {
+	if bit == '0' {
+		return '1'
+	}
+	return '0'
+}
+
 func TestHammingGenericLength(t *testing.T) {
 	message := strings.Repeat("101001", 167)[:1000]
 	encoded, err := HammingEncode(message)
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, _ := RequiredParityBits(len(message))
-	if len(encoded) != len(message)+r {
+	blocks := (len(message) + blockDataBits - 1) / blockDataBits
+	if len(encoded) != blocks*blockCodeBits {
 		t.Fatalf("longitud = %d", len(encoded))
 	}
 	result := HammingDecode(encoded, len(message))

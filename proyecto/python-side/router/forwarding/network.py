@@ -1,7 +1,8 @@
 """Plano de datos: decodifica DATA, consulta la tabla de ruteo y reenvia.
 
-Implementa el pipeline de 9 pasos del enunciado: Hamming(7,4) protege el
-frame {from, to, msg} completo en cada salto. Un router intermedio corrige
+Implementa el pipeline de 9 pasos del enunciado: Hamming(7,4) por bloques
+protege el frame {from, to, msg} completo en cada salto (el frame se parte
+en bloques de 4 bits, cada uno codificado a 7). Un router intermedio corrige
 y deserializa el frame entero (asi lo exige Hamming), pero solo LEE el
 campo "to" para decidir hacia donde reenviar -- nunca actua sobre "msg".
 Unicamente el destino final interpreta el contenido de "msg".
