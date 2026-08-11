@@ -1,10 +1,10 @@
 # Protocolo Link State — CC3067 Lab 3
 
-Este documento formaliza el protocolo implementado por `python-side/router` y
-`go-side/internal/router`. Debe acordarse **sin cambios** con las demas
-parejas de la topologia (interoperabilidad exigida por el enunciado, seccion
-3.3): cualquier modificacion aqui rompe la compatibilidad con los routers de
-otros grupos.
+Este documento formaliza el protocolo implementado en Go por
+`go-side/internal/router`. Debe acordarse **sin cambios** con las demas parejas
+de la topologia (interoperabilidad exigida por el enunciado, seccion 3.3): la
+compatibilidad depende de este contrato de red y no del lenguaje usado por
+cada grupo.
 
 ## 1. Parametros generales
 
@@ -79,11 +79,13 @@ inunda a toda la red por flooding.
 - `links`: vecinos activos (que respondieron HELLO) + host adjunto si existe.
 
 **Reglas de flooding:**
-1. Mantener el conjunto de pares `(origin, seq)` ya procesados.
-2. Si `(origin, seq)` es nuevo: guardar `links` en el grafo local y reenviar
-   a todos los vecinos **excepto** al que lo envio (campo `from` recibido).
+1. Mantener la secuencia maxima aceptada para cada `origin`.
+2. Aceptar un LSA solo cuando `seq` sea mayor que la secuencia maxima de ese
+   origen; guardar `links` en el grafo local y reenviar a todos los vecinos
+   **excepto** al que lo envio (campo `from` recibido).
 3. Antes de reenviar, actualizar `from` a la identidad propia.
-4. Si ya se vio: descartar en silencio.
+4. Si `seq` es duplicado o menor que el maximo ya aceptado, descartar en
+   silencio. Un paquete atrasado nunca puede revertir el grafo.
 5. `seq` solo se incrementa al generar un LSA propio, nunca al reenviar.
 
 ### C. DATA (datos)
@@ -119,7 +121,8 @@ bit volteado en todo el mensaje sin importar su longitud.
 2. Corregir errores sobre **todos** los bits (Hamming, usando `len`).
 3. Extraer los bits de datos ya corregidos.
 4. Deserializar el JSON resultante y leer **solo** el campo `to`.
-5. Consultar `<nodo>_tabla_enrutamiento.csv` con ese valor.
+5. Leer `<nodo>_tabla_enrutamiento.csv` y consultar ese destino. El plano de
+   datos abre el CSV para cada DATA; no usa un mapa privado como sustituto.
 6. Obtener IP y puerto del siguiente salto.
 7. Re-serializar el mismo frame (sin tocar `msg`).
 8. Aplicar Hamming(7,4) de nuevo sobre el frame completo (nueva `bits`).
@@ -147,6 +150,10 @@ destination,next_hop_ip,next_hop_port,cost
 adjunto); `next_hop_ip`/`next_hop_port` son la direccion real de socket del
 primer salto (siempre un vecino directo).
 
+El archivo se genera primero con un nombre temporal y luego reemplaza la tabla
+anterior de forma atomica. Asi, un forwarding concurrente nunca observa un CSV
+parcialmente escrito.
+
 ## 5. Tiempos y comportamiento
 
 | Evento | Regla |
@@ -158,7 +165,7 @@ primer salto (siempre un vecino directo).
 | Convergencia inicial | Esperar 30s antes de calcular y escribir la primera tabla de ruteo (exigido por el enunciado). |
 | Recalculo de rutas | Tras la convergencia inicial, la tabla se recalcula de inmediato cada vez que cambia el grafo (LSA nuevo aceptado, vecino caido/recuperado) y, como respaldo, cada 15s. El CSV solo se reescribe si el resultado realmente cambio. |
 | Hamming | Solo en plano de datos (DATA). HELLO y LSA van en texto plano. |
-| Hilos | El nodo corre routing (control) y forwarding (datos) en hilos/goroutines separados, comunicados por colas internas; un hilo de escucha acepta conexiones TCP y despacha cada mensaje segun su `"type"`; un hilo adicional vigila la expiracion de vecinos y otro recalcula rutas periodicamente. |
+| Concurrencia | El nodo Go corre routing (control) y forwarding (datos) en goroutines separadas, comunicadas por canales internos; otra goroutine acepta conexiones TCP, una vigila la expiracion de vecinos y otra recalcula rutas periodicamente. |
 
 ## 6. Puertos
 
@@ -178,3 +185,18 @@ reparto (**a confirmar con Javier/Dilary antes de las pruebas**):
 | 5000-5002 | Pareja 1 — Daniel Chet / Cristian Tunchez (hasta 3 routers) |
 | 5003-5005 | Pareja 2 — Javier Linares / Dilary Cruz (hasta 3 routers) |
 | 5006-5007 | Pareja 3 simulada (nodos extra, ejecutados por quien corra la prueba) |
+
+## 7. Vectores canonicos de interoperabilidad
+
+`go-side/internal/router/testdata/protocol_vectors.json` contiene ejemplos
+canonicos y autocontenidos de:
+
+- HELLO y LSA serializados como JSON UTF-8 compacto.
+- El vector manual Hamming(7,4) `1011 -> 0110011`.
+- Un payload `{from,to,msg}`, sus bits UTF-8, el envelope DATA protegido y su
+  JSON exterior.
+
+Cada grupo puede decodificar estos valores con su propio lenguaje para validar
+compatibilidad sin ejecutar nuestro codigo. El archivo se regenera con
+`go run ./cmd/vector-gen` desde `go-side/` y la suite comprueba que no se haya
+desviado del protocolo.

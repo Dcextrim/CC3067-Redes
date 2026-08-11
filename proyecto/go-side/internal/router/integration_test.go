@@ -52,6 +52,9 @@ func TestMultiRouterConvergence(t *testing.T) {
 	nodeA.Start()
 	nodeB.Start()
 	nodeC.Start()
+	t.Cleanup(nodeA.Stop)
+	t.Cleanup(nodeB.Stop)
+	t.Cleanup(nodeC.Stop)
 
 	idA, idB, idC := configA.ID(), configB.ID(), configC.ID()
 

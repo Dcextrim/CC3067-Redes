@@ -1,73 +1,118 @@
-# Router: Protocolo Link State
+# Router Link State en Go
 
-Cada nodo router implementa el plano de control (HELLO, LSA, flooding,
-Dijkstra) y el plano de datos (Hamming(7,4) + forwarding) descritos en
-[`docs/protocol.md`](docs/protocol.md). Un router corre dos hilos
-principales en paralelo (routing y forwarding), mas un hilo de escucha que
-despacha cada mensaje entrante segun su `"type"`.
+Implementacion del Laboratorio 3 de CC3067. Cada router ejecuta en paralelo el
+plano de control —HELLO, LSA, flooding, expiracion de vecinos y Dijkstra— y el
+plano de datos —lectura del CSV, Hamming(7,4) y forwarding por TCP—.
 
-## Componentes
+## Estructura
 
-- `python-side/router/` y `go-side/internal/router/` implementan el mismo
-  nodo en Python y Go respectivamente (mismo protocolo, interoperables entre
-  si por JSON).
-- `legacy` de Lab 2 fue removido: no aplica al dominio de enrutamiento.
+- `go-side/cmd/router`: proceso router configurable.
+- `go-side/cmd/client`: host cliente que envia DATA a su gateway.
+- `go-side/cmd/server`: host servidor que recibe DATA desde su gateway.
+- `go-side/internal/router`: protocolo, algoritmos y pruebas Go.
+- `configs/local`: topologia reproducible de seis routers A-F.
+- `docs/protocol.md`: contrato JSON que deben compartir las otras parejas.
+- `go-side/internal/router/testdata/protocol_vectors.json`: vectores canonicos
+  independientes del lenguaje.
+- `data/` y `figures/`: resultados experimentales conservados para el reporte.
 
-## Ejecutar un nodo
+## Requisitos
 
-Sin `config.json`, el nodo pide los datos por consola (igual que en el
-ejemplo del profesor: nombre, IP, puerto, vecinos, host adjunto):
+- Go 1.22 o posterior.
+- PowerShell 7 recomendado para los scripts de automatizacion en Windows.
 
-```
-make run-router-py NAME=U
-make run-router-go NAME=U
-```
+No se requiere instalar dependencias externas.
 
-Con un `config.json` ya escrito (ver formato en `docs/protocol.md`):
+## Compilar y probar
 
-```
-make run-router-py CONFIG=U_config.json
-make run-router-go CONFIG=U_config.json
-```
+Desde `proyecto/`:
 
-Al converger (30s tras arrancar), cada nodo escribe
-`<nombre>_tabla_enrutamiento.csv` con su tabla de ruteo, y sigue
-recalculandola cada vez que el grafo cambia (nuevo LSA, vecino caido).
-
-### Cliente / servidor (hosts no-router)
-
-Un host adjunto no corre el plano de control; solo usa a su router como
-puerta de enlace:
-
-```python
-from router import host
-host.send_via_gateway(self_id="100.w.w.w:6000", gateway_ip="100.x.x.x",
-                       gateway_port=5000, to_id="100.v.v.v:6001", text="hola")
+```powershell
+cd go-side
+go test -count=1 ./...
+go build ./cmd/router ./cmd/client ./cmd/server
 ```
 
-```python
-host.run_server("100.v.v.v", 6001, on_message=print)
+O ejecutar toda la validacion corta:
+
+```powershell
+.\scripts\run_all.ps1
 ```
 
-(Equivalente en Go: `router.SendViaGateway(...)` / `router.RunServer(...)`.)
+Las pruebas incluyen algoritmos, flooding con secuencias, lectura del CSV,
+convergencia real de routers por sockets, cliente-router-servidor end-to-end y
+los vectores canonicos de interoperabilidad.
 
-## Testing y experimentos
+## Ejecutar un router
 
+Sin archivo, el programa solicita nombre, IP, puerto, vecinos y host adjunto:
+
+```powershell
+cd go-side
+go run ./cmd/router
 ```
-make test              # test-python + test-go + test-integration
-make test-python        # algoritmos y plano de datos en Python
-make test-go             # idem en Go
-make test-integration    # interoperabilidad Python <-> Go
-make experiments         # overhead y robustez de Hamming(7,4) -> data/ + figures/
-make clean               # borra artefactos generados (tablas de ruteo, figuras, binarios)
+
+Con configuracion JSON:
+
+```powershell
+cd go-side
+go run ./cmd/router -config ../configs/local/A.json
 ```
 
-## Pendiente
+Al converger escribe `<nombre>_tabla_enrutamiento.csv`. Cuando cambia la
+topologia vuelve a anunciar su LSA, recalcula Dijkstra y reemplaza el CSV de
+forma atomica. Cada trama DATA consulta literalmente ese archivo.
 
-- Confirmar con el profesor si la topologia se completa con 2 parejas (4
-  personas, cada una operando 2 nodos router) o si se une a otra pareja —
-  el enunciado exige topologias de 3 parejas / 6 integrantes.
-- Fijar la asignacion final de puertos una vez conocido el numero de nodos.
-- Acordar con las demas parejas de la topologia el formato exacto de
-  `docs/protocol.md` (especialmente el envoltorio DATA con Hamming sobre el
-  frame completo) antes de las pruebas de interoperabilidad.
+## Cliente y servidor
+
+Servidor adjunto al router F:
+
+```powershell
+cd go-side
+go run ./cmd/server -ip 127.0.0.1 -port 6001
+```
+
+Cliente adjunto al router A:
+
+```powershell
+cd go-side
+go run ./cmd/client -ip 127.0.0.1 -port 6000 `
+  -gateway-ip 127.0.0.1 -gateway-port 5000 `
+  -to 127.0.0.1:6001 -message "hola"
+```
+
+## Topologia local completa
+
+El siguiente comando compila los ejecutables, levanta seis routers y los dos
+hosts, espera la convergencia con los tiempos de produccion, envia un mensaje y
+comprueba que el servidor lo recibio:
+
+```powershell
+.\scripts\run_local_topology.ps1
+```
+
+La ruta optima configurada de A hacia F es A-B-D-E-F, con costo de routers 7.
+Los logs y CSV de cada ejecucion quedan bajo `tmp/local_topology/`.
+
+## Interoperabilidad con otros grupos
+
+El protocolo de red esta especificado en `docs/protocol.md`. Otros equipos
+pueden validar su implementacion con:
+
+```text
+go-side/internal/router/testdata/protocol_vectors.json
+```
+
+El archivo contiene JSON canonico para HELLO, LSA y DATA, un vector manual de
+Hamming(7,4), los bits UTF-8 y el envelope completo. Se regenera con:
+
+```powershell
+cd go-side
+go run ./cmd/vector-gen
+```
+
+## Pendiente externo
+
+- Acordar el protocolo final con las otras parejas antes de la prueba en clase.
+- Sustituir `127.0.0.1` por las IP de Tailscale en configuraciones de despliegue.
+- Incorporar el reporte final PDF en `informe/`.

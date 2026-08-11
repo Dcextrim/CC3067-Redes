@@ -2,28 +2,23 @@ package control
 
 import "sync"
 
-type seenKey struct {
-	origin string
-	seq    int
-}
-
 // LinkStateStore es el estado compartido del grafo entre el hilo/goroutine
 // de routing y las conexiones entrantes que reciben LSA.
 type LinkStateStore struct {
 	SelfID string
 
-	mu    sync.Mutex
-	graph map[string]map[string]int
-	seen  map[seenKey]bool
-	seq   int
+	mu        sync.Mutex
+	graph     map[string]map[string]int
+	latestSeq map[string]int
+	seq       int
 }
 
 // NewLinkStateStore crea el estado vacio para un nodo.
 func NewLinkStateStore(selfID string) *LinkStateStore {
 	return &LinkStateStore{
-		SelfID: selfID,
-		graph:  map[string]map[string]int{},
-		seen:   map[seenKey]bool{},
+		SelfID:    selfID,
+		graph:     map[string]map[string]int{},
+		latestSeq: map[string]int{},
 	}
 }
 
@@ -35,15 +30,16 @@ func (s *LinkStateStore) NextSeq() int {
 	return s.seq
 }
 
-// Record registra un LSA si (origin, seq) es nuevo; retorna false si ya se vio.
+// Record registra un LSA solo si su secuencia es mayor que la ultima aceptada
+// para el mismo origen. Esto evita que un paquete atrasado revierta el grafo a
+// un estado obsoleto despues de haber procesado un LSA mas reciente.
 func (s *LinkStateStore) Record(origin string, seq int, links map[string]int) bool {
-	key := seenKey{origin, seq}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.seen[key] {
+	if latest, ok := s.latestSeq[origin]; ok && seq <= latest {
 		return false
 	}
-	s.seen[key] = true
+	s.latestSeq[origin] = seq
 	copied := make(map[string]int, len(links))
 	for k, v := range links {
 		copied[k] = v

@@ -1,0 +1,10 @@
+{
+  "name": "A",
+  "ip": "127.0.0.1",
+  "port": 5000,
+  "neighbors": [
+    { "ip": "127.0.0.1", "port": 5001, "cost": 2 },
+    { "ip": "127.0.0.1", "port": 5002, "cost": 5 }
+  ],
+  "attached_host": { "role": "client", "ip": "127.0.0.1", "port": 6000, "cost": 1 }
+}

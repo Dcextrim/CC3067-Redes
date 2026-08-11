@@ -24,6 +24,7 @@ func TestConcurrentActiveNeighborsAndRoutes(t *testing.T) {
 		},
 	}
 	n := NewNode(config, t.TempDir()+"/routing_table.csv")
+	t.Cleanup(n.Stop)
 
 	var wg sync.WaitGroup
 

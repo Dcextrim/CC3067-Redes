@@ -62,6 +62,17 @@ func EncodeEnvelope(payload control.Payload) (control.DataEnvelope, error) {
 // SendFunc envia un mensaje ya serializable por socket hacia ip:puerto.
 type SendFunc func(ip string, port int, message interface{})
 
+// ForwardUsingRoutingTable cumple el contrato del laboratorio: consulta el
+// archivo <nodo>_tabla_enrutamiento.csv para cada trama DATA y usa la ruta
+// vigente escrita por el plano de control.
+func ForwardUsingRoutingTable(message control.DataEnvelope, tablePath string, send SendFunc) error {
+	routes, err := control.ReadRoutingTable(tablePath)
+	if err != nil {
+		return fmt.Errorf("no se pudo consultar la tabla de ruteo %s: %w", tablePath, err)
+	}
+	return Forward(message, routes, send)
+}
+
 // Forward deserializa solo "to", consulta la tabla, re-codifica y reenvia.
 func Forward(message control.DataEnvelope, routes map[string]control.Route, send SendFunc) error {
 	dataBits, err := DecodeFrame(message)

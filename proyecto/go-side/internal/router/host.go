@@ -3,8 +3,9 @@ package router
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net"
+	"time"
 
 	"cc3067/lab3/go-side/internal/router/control"
 	"cc3067/lab3/go-side/internal/router/forwarding"
@@ -18,8 +19,8 @@ func SendViaGateway(selfID, gatewayIP string, gatewayPort int, toID, text string
 	if err != nil {
 		return err
 	}
-	address := fmt.Sprintf("%s:%d", gatewayIP, gatewayPort)
-	conn, err := net.Dial("tcp", address)
+	address := NodeID(gatewayIP, gatewayPort)
+	conn, err := net.DialTimeout("tcp", address, 5*time.Second)
 	if err != nil {
 		return err
 	}
@@ -34,16 +35,25 @@ func SendViaGateway(selfID, gatewayIP string, gatewayPort int, toID, text string
 
 // RunServer escucha DATA que el router-gateway local ya resolvio hasta este host.
 func RunServer(listenIP string, listenPort int, onMessage func(control.Payload)) error {
-	address := fmt.Sprintf("%s:%d", listenIP, listenPort)
+	address := NodeID(listenIP, listenPort)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return err
 	}
 	defer listener.Close()
+	return ServeHost(listener, onMessage)
+}
+
+// ServeHost atiende DATA sobre un listener ya creado. Separar el listener de
+// la logica permite cerrar limpiamente servidores en pruebas end-to-end.
+func ServeHost(listener net.Listener, onMessage func(control.Payload)) error {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			continue
+			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
+			return err
 		}
 		go func(c net.Conn) {
 			defer c.Close()

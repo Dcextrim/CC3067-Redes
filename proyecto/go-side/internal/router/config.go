@@ -2,8 +2,9 @@ package router
 
 import (
 	"encoding/json"
-	"fmt"
+	"net"
 	"os"
+	"strconv"
 )
 
 // Neighbor es un vecino directo configurado para este nodo.
@@ -29,11 +30,11 @@ func (h AttachedHost) ID() string { return NodeID(h.IP, h.Port) }
 
 // NodeConfig es la configuracion completa de un nodo, leida de config.json.
 type NodeConfig struct {
-	Name         string         `json:"name"`
-	IP           string         `json:"ip"`
-	Port         int            `json:"port"`
-	Neighbors    []Neighbor     `json:"neighbors"`
-	AttachedHost *AttachedHost  `json:"attached_host"`
+	Name         string        `json:"name"`
+	IP           string        `json:"ip"`
+	Port         int           `json:"port"`
+	Neighbors    []Neighbor    `json:"neighbors"`
+	AttachedHost *AttachedHost `json:"attached_host"`
 }
 
 // ID identifica a este nodo como ip:puerto. La IP sola no alcanza para
@@ -41,7 +42,7 @@ type NodeConfig struct {
 func (c NodeConfig) ID() string { return NodeID(c.IP, c.Port) }
 
 // NodeID arma el identificador canonico ip:puerto de cualquier nodo.
-func NodeID(ip string, port int) string { return fmt.Sprintf("%s:%d", ip, port) }
+func NodeID(ip string, port int) string { return net.JoinHostPort(ip, strconv.Itoa(port)) }
 
 // LoadConfig lee y valida el config.json de un nodo.
 func LoadConfig(path string) (NodeConfig, error) {

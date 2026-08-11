@@ -1,15 +1,16 @@
-__pycache__/
-*.py[cod]
-.pytest_cache/
-bank-server.exe
-bank-server
 tmp/
 output/
+proyecto/go-side/bin/
+proyecto/go-side/router
+proyecto/go-side/router.exe
+proyecto/go-side/client
+proyecto/go-side/client.exe
+proyecto/go-side/server
+proyecto/go-side/server.exe
+*_tabla_enrutamiento.csv
 *:Zone.Identifier
 
 # El reporte final es lo unico que se versiona en informe/; el resto de PDFs
 # sueltos (enunciado, borradores) y el generador automatico quedan fuera.
 *.pdf
 !informe/*.pdf
-report_config.json
-generate_report.py

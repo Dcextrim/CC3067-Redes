@@ -1,36 +1,40 @@
-PYTHON ?= python3
 GO ?= go
-NAME ?= A
-CONFIG ?= $(NAME)_config.json
+CONFIG ?= configs/local/A.json
+DESTINATION ?= 127.0.0.1:6001
+MESSAGE ?= hola
 
-.PHONY: build run-router-py run-router-go test test-python test-go test-integration experiments all clean
+.PHONY: build build-router build-client build-server run-router run-client run-server test vectors local all clean
 
-build:
+build: build-router build-client build-server
+
+build-router:
 	cd go-side && $(GO) build -o router ./cmd/router
 
-# Levanta un nodo router en Python. Sin CONFIG pide los datos por consola,
-# igual que el ejemplo del profesor (make run-router-py NAME=U).
-run-router-py:
-	cd python-side && PYTHONPATH=. $(PYTHON) -m router.main $(if $(wildcard $(CONFIG)),--config $(CONFIG),)
+build-client:
+	cd go-side && $(GO) build -o client ./cmd/client
 
-run-router-go: build
-	./go-side/router $(if $(wildcard $(CONFIG)),-config $(CONFIG),)
+build-server:
+	cd go-side && $(GO) build -o server ./cmd/server
 
-test-python:
-	PYTHONPATH=python-side $(PYTHON) -m unittest discover -s tests -p "test_python_*.py" -v
+run-router:
+	cd go-side && $(GO) run ./cmd/router -config ../$(CONFIG)
 
-test-go:
-	cd go-side && $(GO) test ./...
+run-client:
+	cd go-side && $(GO) run ./cmd/client -to $(DESTINATION) -message "$(MESSAGE)"
 
-test-integration:
-	$(PYTHON) tests/integration_cross_language.py
+run-server:
+	cd go-side && $(GO) run ./cmd/server
 
-test: test-python test-go test-integration
+test:
+	cd go-side && $(GO) test -count=1 ./...
 
-experiments:
-	$(PYTHON) scripts/run_experiments.py
+vectors:
+	cd go-side && $(GO) run ./cmd/vector-gen
 
-all: build test experiments
+local:
+	powershell -ExecutionPolicy Bypass -File scripts/run_local_topology.ps1 -Message "$(MESSAGE)"
+
+all: vectors test build
 
 clean:
-	$(PYTHON) scripts/clean_generated.py
+	powershell -ExecutionPolicy Bypass -File scripts/clean_generated.ps1

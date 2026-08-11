@@ -56,12 +56,16 @@ type Node struct {
 	// activeNeighbors/lastHelloAt (routingLoop + neighborWatchdog), routes
 	// (convergenceLoop + forwardingLoop), y los flags de coordinacion.
 	mu              sync.RWMutex
+	recomputeMu     sync.Mutex
 	activeNeighbors map[string]bool
 	lastHelloAt     map[string]time.Time
 	routes          map[string]control.Route
 	firstHelloSeen  bool
 	converged       bool
 	lastLSARebuild  time.Time
+	listener        net.Listener
+	stop            chan struct{}
+	stopOnce        sync.Once
 
 	routingQueue    chan map[string]interface{}
 	forwardingQueue chan control.DataEnvelope
@@ -88,6 +92,7 @@ func NewNode(config NodeConfig, csvPath string) *Node {
 		routes:                  map[string]control.Route{},
 		routingQueue:            make(chan map[string]interface{}, 64),
 		forwardingQueue:         make(chan control.DataEnvelope, 64),
+		stop:                    make(chan struct{}),
 	}
 }
 
@@ -104,12 +109,39 @@ func (n *Node) Start() {
 // RunForever arranca el nodo y bloquea el proceso principal.
 func (n *Node) RunForever() {
 	n.Start()
-	select {}
+	<-n.stop
+}
+
+// Stop detiene los loops y cierra el listener. Es idempotente y permite que
+// las pruebas liberen sockets/goroutines sin esperar a que termine el proceso.
+func (n *Node) Stop() {
+	n.stopOnce.Do(func() {
+		close(n.stop)
+		n.mu.Lock()
+		listener := n.listener
+		n.listener = nil
+		n.mu.Unlock()
+		if listener != nil {
+			_ = listener.Close()
+		}
+	})
+}
+
+func (n *Node) stopped() bool {
+	select {
+	case <-n.stop:
+		return true
+	default:
+		return false
+	}
 }
 
 // SendMessage abre una conexion TCP corta, envia un mensaje JSON y cierra.
 func (n *Node) SendMessage(ip string, port int, message interface{}) {
-	address := fmt.Sprintf("%s:%d", ip, port)
+	if n.stopped() {
+		return
+	}
+	address := NodeID(ip, port)
 	conn, err := net.DialTimeout("tcp", address, 5*time.Second)
 	if err != nil {
 		log.Printf("[NETWORK %s] no se pudo enviar a %s (%v)", n.Config.ID(), address, err)
@@ -125,15 +157,28 @@ func (n *Node) SendMessage(ip string, port int, message interface{}) {
 }
 
 func (n *Node) listenLoop() {
-	address := fmt.Sprintf("%s:%d", n.Config.IP, n.Config.Port)
+	address := NodeID(n.Config.IP, n.Config.Port)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		log.Fatalf("[NETWORK %s] no se pudo escuchar en %s: %v", n.Config.ID(), address, err)
+		log.Printf("[NETWORK %s] no se pudo escuchar en %s: %v", n.Config.ID(), address, err)
+		n.Stop()
+		return
 	}
+	n.mu.Lock()
+	if n.stopped() {
+		n.mu.Unlock()
+		_ = listener.Close()
+		return
+	}
+	n.listener = listener
+	n.mu.Unlock()
 	log.Printf("[NETWORK %s] Listening", n.Config.ID())
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
+			if n.stopped() {
+				return
+			}
 			continue
 		}
 		go n.handleConnection(conn)
@@ -154,11 +199,17 @@ func (n *Node) handleConnection(conn net.Conn) {
 	if generic["type"] == control.DATA {
 		var envelope control.DataEnvelope
 		if err := json.Unmarshal([]byte(line), &envelope); err == nil {
-			n.forwardingQueue <- envelope
+			select {
+			case n.forwardingQueue <- envelope:
+			case <-n.stop:
+			}
 		}
 		return
 	}
-	n.routingQueue <- generic
+	select {
+	case n.routingQueue <- generic:
+	case <-n.stop:
+	}
 }
 
 // -- plano de control (goroutine de routing) --------------------------------
@@ -168,17 +219,30 @@ func (n *Node) helloLoop() {
 		for _, neighbor := range n.Config.Neighbors {
 			n.SendMessage(neighbor.IP, neighbor.Port, control.BuildHello(n.Config.ID()))
 		}
-		time.Sleep(n.HelloInterval)
+		timer := time.NewTimer(n.HelloInterval)
+		select {
+		case <-timer.C:
+		case <-n.stop:
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return
+		}
 	}
 }
 
 func (n *Node) routingLoop() {
-	for message := range n.routingQueue {
-		switch message["type"] {
-		case control.HELLO:
-			n.onHello(message["from"].(string))
-		case control.LSA:
-			n.onLSA(message)
+	for {
+		select {
+		case message := <-n.routingQueue:
+			switch message["type"] {
+			case control.HELLO:
+				n.onHello(message["from"].(string))
+			case control.LSA:
+				n.onLSA(message)
+			}
+		case <-n.stop:
+			return
 		}
 	}
 }
@@ -213,7 +277,12 @@ func (n *Node) onHello(sender string) {
 func (n *Node) neighborWatchdog() {
 	ticker := time.NewTicker(n.NeighborCheckInterval)
 	defer ticker.Stop()
-	for range ticker.C {
+	for {
+		select {
+		case <-n.stop:
+			return
+		case <-ticker.C:
+		}
 		changed := false
 		n.mu.Lock()
 		for _, neighbor := range n.Config.Neighbors {
@@ -250,6 +319,9 @@ func (n *Node) requestLSARebuild() {
 }
 
 func (n *Node) buildAndFloodOwnLSA() {
+	if n.stopped() {
+		return
+	}
 	links := map[string]int{}
 	n.mu.Lock()
 	n.lastLSARebuild = time.Now()
@@ -304,7 +376,15 @@ func (n *Node) flood(lsa control.LSAMessage, excludeID string) {
 // vez que cambia el grafo (maybeRecomputeRoutes) y, como respaldo, en cada
 // tick de RouteRecomputeInterval por si algun evento no disparo el recalculo.
 func (n *Node) convergenceLoop() {
-	time.Sleep(n.ConvergenceWait)
+	timer := time.NewTimer(n.ConvergenceWait)
+	select {
+	case <-timer.C:
+	case <-n.stop:
+		if !timer.Stop() {
+			<-timer.C
+		}
+		return
+	}
 	n.mu.Lock()
 	n.converged = true
 	n.mu.Unlock()
@@ -313,8 +393,13 @@ func (n *Node) convergenceLoop() {
 
 	ticker := time.NewTicker(n.RouteRecomputeInterval)
 	defer ticker.Stop()
-	for range ticker.C {
-		n.recomputeRoutes()
+	for {
+		select {
+		case <-ticker.C:
+			n.recomputeRoutes()
+		case <-n.stop:
+			return
+		}
 	}
 }
 
@@ -331,6 +416,11 @@ func (n *Node) maybeRecomputeRoutes() {
 }
 
 func (n *Node) recomputeRoutes() {
+	n.recomputeMu.Lock()
+	defer n.recomputeMu.Unlock()
+	if n.stopped() {
+		return
+	}
 	graph := n.store.Snapshot()
 	paths := algorithms.ShortestPaths(graph, n.Config.ID())
 	routes := map[string]control.Route{}
@@ -343,10 +433,9 @@ func (n *Node) recomputeRoutes() {
 		}
 	}
 
-	n.mu.Lock()
+	n.mu.RLock()
 	changed := !routesEqual(n.routes, routes)
-	n.routes = routes
-	n.mu.Unlock()
+	n.mu.RUnlock()
 	if !changed {
 		return
 	}
@@ -359,6 +448,11 @@ func (n *Node) recomputeRoutes() {
 		log.Printf("[NETWORK %s] error escribiendo tabla de ruteo: %v", n.Config.ID(), err)
 		return
 	}
+	// Publicar la ruta solo despues de que el CSV completo ya es visible. Asi,
+	// cualquier consumidor que observe n.routes tambien puede leer la tabla.
+	n.mu.Lock()
+	n.routes = routes
+	n.mu.Unlock()
 	log.Printf("[NETWORK %s] Routing table written to %s", n.Config.ID(), n.CSVPath)
 }
 
@@ -402,13 +496,15 @@ func (n *Node) ipFor(nodeID string) string {
 // -- plano de datos (goroutine de forwarding) ------------------------------------
 
 func (n *Node) forwardingLoop() {
-	for envelope := range n.forwardingQueue {
-		send := func(ip string, port int, message interface{}) { n.SendMessage(ip, port, message) }
-		n.mu.RLock()
-		routes := n.routes
-		n.mu.RUnlock()
-		if err := forwarding.Forward(envelope, routes, send); err != nil {
-			log.Printf("[NETWORK %s] %v", n.Config.ID(), err)
+	for {
+		select {
+		case envelope := <-n.forwardingQueue:
+			send := func(ip string, port int, message interface{}) { n.SendMessage(ip, port, message) }
+			if err := forwarding.ForwardUsingRoutingTable(envelope, n.CSVPath, send); err != nil {
+				log.Printf("[NETWORK %s] %v", n.Config.ID(), err)
+			}
+		case <-n.stop:
+			return
 		}
 	}
 }

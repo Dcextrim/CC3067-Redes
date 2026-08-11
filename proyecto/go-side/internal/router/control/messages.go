@@ -19,11 +19,11 @@ func BuildHello(fromID string) Hello { return Hello{Type: HELLO, From: fromID} }
 
 // LSAMessage es el Link State Advertisement que se inunda a toda la red.
 type LSAMessage struct {
-	Type  string         `json:"type"`
-	Origin string        `json:"origin"`
-	Seq   int            `json:"seq"`
-	Links map[string]int `json:"links"`
-	From  string         `json:"from"`
+	Type   string         `json:"type"`
+	Origin string         `json:"origin"`
+	Seq    int            `json:"seq"`
+	Links  map[string]int `json:"links"`
+	From   string         `json:"from"`
 }
 
 // BuildLSA arma un LSA propio; origin y from inician iguales al emisor.
