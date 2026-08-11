@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"cc3067/lab3/go-side/internal/router/algorithms"
@@ -25,12 +26,18 @@ type Node struct {
 	Config  NodeConfig
 	CSVPath string
 
-	store            *control.LinkStateStore
-	activeNeighbors  map[string]bool
-	routes           map[string]control.Route
-	routingQueue     chan map[string]interface{}
-	forwardingQueue  chan control.DataEnvelope
-	firstHelloSeen   bool
+	store *control.LinkStateStore
+
+	// mu protege activeNeighbors y routes: se leen/escriben desde goroutines
+	// distintas (routingLoop, el timer de buildAndFloodOwnLSA, convergenceTimer
+	// y forwardingLoop corren en paralelo).
+	mu              sync.RWMutex
+	activeNeighbors map[string]bool
+	routes          map[string]control.Route
+
+	routingQueue    chan map[string]interface{}
+	forwardingQueue chan control.DataEnvelope
+	firstHelloSeen  bool
 }
 
 // NewNode crea un nodo listo para arrancar con Start/RunForever.
@@ -141,8 +148,10 @@ func (n *Node) routingLoop() {
 }
 
 func (n *Node) onHello(sender string) {
+	n.mu.Lock()
 	firstTime := !n.activeNeighbors[sender]
 	n.activeNeighbors[sender] = true
+	n.mu.Unlock()
 	log.Printf("[NETWORK %s] HELLO reply from %s", n.Config.ID(), sender)
 	if firstTime && !n.firstHelloSeen {
 		n.firstHelloSeen = true
@@ -153,11 +162,13 @@ func (n *Node) onHello(sender string) {
 
 func (n *Node) buildAndFloodOwnLSA() {
 	links := map[string]int{}
+	n.mu.RLock()
 	for _, neighbor := range n.Config.Neighbors {
 		if n.activeNeighbors[neighbor.ID()] {
 			links[neighbor.ID()] = neighbor.Cost
 		}
 	}
+	n.mu.RUnlock()
 	if n.Config.AttachedHost != nil {
 		links[n.Config.AttachedHost.ID()] = n.Config.AttachedHost.Cost
 	}
@@ -214,7 +225,9 @@ func (n *Node) convergenceTimer() {
 			Cost:        result.Cost,
 		}
 	}
+	n.mu.Lock()
 	n.routes = routes
+	n.mu.Unlock()
 	if err := control.WriteRoutingTable(n.CSVPath, routes); err != nil {
 		log.Printf("[NETWORK %s] error escribiendo tabla de ruteo: %v", n.Config.ID(), err)
 		return
@@ -252,7 +265,10 @@ func (n *Node) ipFor(nodeID string) string {
 func (n *Node) forwardingLoop() {
 	for envelope := range n.forwardingQueue {
 		send := func(ip string, port int, message interface{}) { n.SendMessage(ip, port, message) }
-		if err := forwarding.Forward(envelope, n.routes, send); err != nil {
+		n.mu.RLock()
+		routes := n.routes
+		n.mu.RUnlock()
+		if err := forwarding.Forward(envelope, routes, send); err != nil {
 			log.Printf("[NETWORK %s] %v", n.Config.ID(), err)
 		}
 	}
