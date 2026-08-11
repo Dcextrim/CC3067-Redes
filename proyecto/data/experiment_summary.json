@@ -1,14 +1,14 @@
 {
   "seed": 3067,
   "trials_per_combination": 300,
-  "combinations": 50,
-  "total_transmissions": 15000,
-  "message_sizes_bytes": [
-    1,
-    4,
-    16,
+  "combinations": 25,
+  "total_transmissions": 7500,
+  "frame_sizes_bytes": [
+    32,
     64,
-    256
+    128,
+    256,
+    512
   ],
   "error_rates": [
     0.0,
@@ -17,8 +17,5 @@
     0.01,
     0.02
   ],
-  "algorithms": [
-    "hamming",
-    "crc32"
-  ]
+  "algorithm": "hamming"
 }

@@ -10,8 +10,10 @@ TARGETS = (
     ROOT / "figures" / "overhead.png",
     ROOT / "figures" / "recovery_rate.png",
     ROOT / "figures" / "outcomes.png",
-    ROOT / "go-side" / "bank-server.exe",
-    ROOT / "go-side" / "bank-server",
+    ROOT / "go-side" / "router.exe",
+    ROOT / "go-side" / "router",
+    *ROOT.glob("*_routing_table.csv"),
+    *ROOT.glob("python-side/*_routing_table.csv"),
 )
 
 for target in TARGETS:

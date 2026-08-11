@@ -1,10 +1,20 @@
-PYTHON ?= python
+PYTHON ?= python3
 GO ?= go
+NAME ?= A
+CONFIG ?= $(NAME)_config.json
 
-.PHONY: build test test-python test-go test-integration experiments all clean
+.PHONY: build run-router-py run-router-go test test-python test-go test-integration experiments all clean
 
 build:
-	cd go-side && $(GO) build -o bank-server.exe ./cmd/server
+	cd go-side && $(GO) build -o router ./cmd/router
+
+# Levanta un nodo router en Python. Sin CONFIG pide los datos por consola,
+# igual que el ejemplo del profesor (make run-router-py NAME=U).
+run-router-py:
+	cd python-side && PYTHONPATH=. $(PYTHON) -m router.main $(if $(wildcard $(CONFIG)),--config $(CONFIG),)
+
+run-router-go: build
+	./go-side/router $(if $(wildcard $(CONFIG)),-config $(CONFIG),)
 
 test-python:
 	PYTHONPATH=python-side $(PYTHON) -m unittest discover -s tests -p "test_python_*.py" -v

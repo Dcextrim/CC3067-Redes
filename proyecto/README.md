@@ -1,62 +1,72 @@
-# Cajero-Banco: mensajeria resiliente a errores
+# Router: Protocolo Link State
 
-Simulacion de un cajero automatico (Python) que hace login con tarjeta+PIN y retira dinero
-de un servidor bancario (Go), sobre TCP y a traves de un canal no confiable. Cada envio
-(login, retiro, logout) elige entre Hamming o CRC-32 para verificar la integridad y una
-probabilidad de bit flip propia. Las respuestas automaticas del banco viajan por el mismo
-pipeline de capas, sin ruido.
+Cada nodo router implementa el plano de control (HELLO, LSA, flooding,
+Dijkstra) y el plano de datos (Hamming(7,4) + forwarding) descritos en
+[`docs/protocol.md`](docs/protocol.md). Un router corre dos hilos
+principales en paralelo (routing y forwarding), mas un hilo de escucha que
+despacha cada mensaje entrante segun su `"type"`.
 
-Los archivos `legacy/client.py` y `legacy/server.py` son el cliente/servidor base original
-(login+retiro sobre JSON plano, sin capas ni deteccion de errores) que se uso como punto de
-partida, conservados sin cambios como referencia. La implementacion nueva envuelve ese mismo
-flujo transaccional con las cinco capas, separadas en `python-side/` y `go-side/`.
+## Componentes
 
-## Estructura
+- `python-side/router/` y `go-side/internal/router/` implementan el mismo
+  nodo en Python y Go respectivamente (mismo protocolo, interoperables entre
+  si por JSON).
+- `legacy` de Lab 2 fue removido: no aplica al dominio de enrutamiento.
 
-```text
-python-side/atm/          cajero Python y sus cinco capas
-go-side/                  servidor Go y sus cinco capas
-tests/                    unitarias Python e interoperabilidad TCP
-docs/protocol.md          framing y convenciones bit a bit
-scripts/                  experimentos y automatizacion de pruebas
-data/                     resultados CSV reproducibles
-figures/                  graficas generadas
-legacy/                   cliente/servidor base sin capas, como referencia
+## Ejecutar un nodo
+
+Sin `config.json`, el nodo pide los datos por consola (igual que en el
+ejemplo del profesor: nombre, IP, puerto, vecinos, host adjunto):
+
+```
+make run-router-py NAME=U
+make run-router-go NAME=U
 ```
 
-## Ejecucion interactiva
+Con un `config.json` ya escrito (ver formato en `docs/protocol.md`):
 
-Terminal 1, servidor Go (queda escuchando en el puerto elegido):
-
-```powershell
-Set-Location .\go-side
-go run .\cmd\server --host 127.0.0.1 --port 9000
+```
+make run-router-py CONFIG=U_config.json
+make run-router-go CONFIG=U_config.json
 ```
 
-Terminal 2, cajero Python:
+Al converger (30s tras arrancar), cada nodo escribe
+`<nombre>_routing_table.csv` con su tabla de ruteo.
 
-```powershell
-$env:PYTHONPATH = ".\python-side"
-python -m atm.main --host 127.0.0.1 --port 9000
+### Cliente / servidor (hosts no-router)
+
+Un host adjunto no corre el plano de control; solo usa a su router como
+puerta de enlace:
+
+```python
+from router import host
+host.send_via_gateway(self_id="100.w.w.w:6000", gateway_ip="100.x.x.x",
+                       gateway_port=5000, to_id="100.v.v.v:6001", text="hola")
 ```
 
-El cajero pide numero de tarjeta y PIN (reintenta hasta autenticar); las cuentas de prueba
-son `4111111111111111`/`1234` y `5500005555555559`/`0000`. Ya autenticado, el menu permite
-retirar dinero o salir. Cada envio pide el algoritmo (`1`=hamming, `2`=crc32) y una tasa de
-ruido como `0.01` o `1/100`. Ambos procesos muestran cuantos bits fueron volteados y si el
-receptor corrigio o rechazo la trama.
-
-## Pruebas y artefactos
-
-En PowerShell, el flujo completo se ejecuta con:
-
-```powershell
-.\scripts\run_all.ps1
+```python
+host.run_server("100.v.v.v", 6001, on_message=print)
 ```
 
-Tambien se incluye un `Makefile`: `make test`, `make experiments` y `make all`.
-Las pruebas incluyen los vectores manuales documentados, errores de un bit en todas las posiciones,
-longitudes genericas, framing TCP y una sesion real Python-Go extremo a extremo (login, retiro
-exitoso y con fondos insuficientes, logout) sobre el algoritmo elegido.
+(Equivalente en Go: `router.SendViaGateway(...)` / `router.RunServer(...)`.)
 
-La especificacion completa del formato esta en [docs/protocol.md](docs/protocol.md).
+## Testing y experimentos
+
+```
+make test              # test-python + test-go + test-integration
+make test-python        # algoritmos y plano de datos en Python
+make test-go             # idem en Go
+make test-integration    # interoperabilidad Python <-> Go
+make experiments         # overhead y robustez de Hamming(7,4) -> data/ + figures/
+make clean               # borra artefactos generados (tablas de ruteo, figuras, binarios)
+```
+
+## Pendiente
+
+- Confirmar con el profesor si la topologia se completa con 2 parejas (4
+  personas, cada una operando 2 nodos router) o si se une a otra pareja —
+  el enunciado exige topologias de 3 parejas / 6 integrantes.
+- Fijar la asignacion final de puertos una vez conocido el numero de nodos.
+- Acordar con las demas parejas de la topologia el formato exacto de
+  `docs/protocol.md` (especialmente el envoltorio DATA con Hamming sobre el
+  frame completo) antes de las pruebas de interoperabilidad.
