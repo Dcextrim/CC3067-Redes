@@ -1,4 +1,4 @@
-package noise
+package algorithms
 
 import (
 	"math/rand"

@@ -1,5 +1,5 @@
-// Package presentation transforma mensajes ASCII y cadenas binarias.
-package presentation
+// Package codec transforma mensajes ASCII y cadenas binarias para el nodo.
+package codec
 
 import (
 	"fmt"

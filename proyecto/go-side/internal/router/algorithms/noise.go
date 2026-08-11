@@ -1,5 +1,5 @@
-// Package noise simula un canal binario simetrico entre Enlace y Transmision.
-package noise
+// Package algorithms contiene Hamming, Dijkstra y el simulador de ruido.
+package algorithms
 
 import (
 	"fmt"
