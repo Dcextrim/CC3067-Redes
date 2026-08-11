@@ -15,9 +15,23 @@ import (
 )
 
 const (
-	HelloIntervalS            = 10 * time.Second
-	LSADelayAfterFirstHelloS  = 5 * time.Second
-	ConvergenceWaitS          = 30 * time.Second
+	HelloIntervalS           = 10 * time.Second
+	LSADelayAfterFirstHelloS = 5 * time.Second
+	ConvergenceWaitS         = 30 * time.Second
+
+	// NeighborTimeoutS: si no llega HELLO de un vecino activo en este lapso
+	// (3 ciclos de HELLO), se marca como caido y se regenera el LSA propio.
+	NeighborTimeoutS       = 3 * HelloIntervalS
+	NeighborCheckIntervalS = 5 * time.Second
+
+	// RouteRecomputeIntervalS es el respaldo periodico: ademas de recalcular
+	// de inmediato cuando cambia el grafo (nuevo LSA, vecino caido/recuperado),
+	// se revisa con esta cadencia por si algun evento se perdio.
+	RouteRecomputeIntervalS = 15 * time.Second
+
+	// LSARebuildDebounceS evita floodear un LSA nuevo por cada cambio de
+	// vecino si varios ocurren juntos (p.ej. varios vecinos caen a la vez).
+	LSARebuildDebounceS = 3 * time.Second
 )
 
 // Node es un router: goroutine de escucha + goroutine de routing + goroutine
@@ -26,33 +40,54 @@ type Node struct {
 	Config  NodeConfig
 	CSVPath string
 
+	// Overrides opcionales de temporizacion, solo para pruebas (por defecto
+	// se usan las constantes de arriba, que son las exigidas por el enunciado).
+	HelloInterval           time.Duration
+	LSADelayAfterFirstHello time.Duration
+	ConvergenceWait         time.Duration
+	NeighborTimeout         time.Duration
+	NeighborCheckInterval   time.Duration
+	RouteRecomputeInterval  time.Duration
+	LSARebuildDebounce      time.Duration
+
 	store *control.LinkStateStore
 
-	// mu protege activeNeighbors y routes: se leen/escriben desde goroutines
-	// distintas (routingLoop, el timer de buildAndFloodOwnLSA, convergenceTimer
-	// y forwardingLoop corren en paralelo).
+	// mu protege todo el estado mutable compartido entre goroutines:
+	// activeNeighbors/lastHelloAt (routingLoop + neighborWatchdog), routes
+	// (convergenceLoop + forwardingLoop), y los flags de coordinacion.
 	mu              sync.RWMutex
 	activeNeighbors map[string]bool
+	lastHelloAt     map[string]time.Time
 	routes          map[string]control.Route
+	firstHelloSeen  bool
+	converged       bool
+	lastLSARebuild  time.Time
 
 	routingQueue    chan map[string]interface{}
 	forwardingQueue chan control.DataEnvelope
-	firstHelloSeen  bool
 }
 
 // NewNode crea un nodo listo para arrancar con Start/RunForever.
 func NewNode(config NodeConfig, csvPath string) *Node {
 	if csvPath == "" {
-		csvPath = fmt.Sprintf("%s_routing_table.csv", config.Name)
+		csvPath = fmt.Sprintf("%s_tabla_enrutamiento.csv", config.Name)
 	}
 	return &Node{
-		Config:          config,
-		CSVPath:         csvPath,
-		store:           control.NewLinkStateStore(config.ID()),
-		activeNeighbors: map[string]bool{},
-		routes:          map[string]control.Route{},
-		routingQueue:    make(chan map[string]interface{}, 64),
-		forwardingQueue: make(chan control.DataEnvelope, 64),
+		Config:                  config,
+		CSVPath:                 csvPath,
+		HelloInterval:           HelloIntervalS,
+		LSADelayAfterFirstHello: LSADelayAfterFirstHelloS,
+		ConvergenceWait:         ConvergenceWaitS,
+		NeighborTimeout:         NeighborTimeoutS,
+		NeighborCheckInterval:   NeighborCheckIntervalS,
+		RouteRecomputeInterval:  RouteRecomputeIntervalS,
+		LSARebuildDebounce:      LSARebuildDebounceS,
+		store:                   control.NewLinkStateStore(config.ID()),
+		activeNeighbors:         map[string]bool{},
+		lastHelloAt:             map[string]time.Time{},
+		routes:                  map[string]control.Route{},
+		routingQueue:            make(chan map[string]interface{}, 64),
+		forwardingQueue:         make(chan control.DataEnvelope, 64),
 	}
 }
 
@@ -62,7 +97,8 @@ func (n *Node) Start() {
 	go n.helloLoop()
 	go n.routingLoop()
 	go n.forwardingLoop()
-	go n.convergenceTimer()
+	go n.neighborWatchdog()
+	go n.convergenceLoop()
 }
 
 // RunForever arranca el nodo y bloquea el proceso principal.
@@ -132,7 +168,7 @@ func (n *Node) helloLoop() {
 		for _, neighbor := range n.Config.Neighbors {
 			n.SendMessage(neighbor.IP, neighbor.Port, control.BuildHello(n.Config.ID()))
 		}
-		time.Sleep(HelloIntervalS)
+		time.Sleep(n.HelloInterval)
 	}
 }
 
@@ -149,26 +185,80 @@ func (n *Node) routingLoop() {
 
 func (n *Node) onHello(sender string) {
 	n.mu.Lock()
+	n.lastHelloAt[sender] = time.Now()
 	firstTime := !n.activeNeighbors[sender]
 	n.activeNeighbors[sender] = true
+	isVeryFirstHello := !n.firstHelloSeen
+	if isVeryFirstHello {
+		n.firstHelloSeen = true
+	}
 	n.mu.Unlock()
 	log.Printf("[NETWORK %s] HELLO reply from %s", n.Config.ID(), sender)
-	if firstTime && !n.firstHelloSeen {
-		n.firstHelloSeen = true
-		log.Printf("[ROUTER %s] Waiting %s before building the LSA...", n.Config.Name, LSADelayAfterFirstHelloS)
-		time.AfterFunc(LSADelayAfterFirstHelloS, n.buildAndFloodOwnLSA)
+	if !firstTime {
+		return
 	}
+	if isVeryFirstHello {
+		log.Printf("[ROUTER %s] Waiting %s before building the LSA...", n.Config.Name, n.LSADelayAfterFirstHello)
+		time.AfterFunc(n.LSADelayAfterFirstHello, n.buildAndFloodOwnLSA)
+		return
+	}
+	// Un vecino que ya habia caido volvio a responder: no es el primer HELLO
+	// del nodo, pero si cambia la topologia -> hay que avisar con un LSA nuevo.
+	n.requestLSARebuild()
+}
+
+// neighborWatchdog vigila que los vecinos activos sigan enviando HELLO; si
+// uno deja de hacerlo por NeighborTimeout, se marca como caido y se pide un
+// LSA nuevo (la topologia cambio, igual que si el vecino nunca hubiera estado ahi).
+func (n *Node) neighborWatchdog() {
+	ticker := time.NewTicker(n.NeighborCheckInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		changed := false
+		n.mu.Lock()
+		for _, neighbor := range n.Config.Neighbors {
+			id := neighbor.ID()
+			if !n.activeNeighbors[id] {
+				continue
+			}
+			if time.Since(n.lastHelloAt[id]) > n.NeighborTimeout {
+				n.activeNeighbors[id] = false
+				changed = true
+				log.Printf("[ROUTER %s] Neighbor %s expired (sin HELLO en %s)", n.Config.Name, id, n.NeighborTimeout)
+			}
+		}
+		n.mu.Unlock()
+		if changed {
+			n.requestLSARebuild()
+		}
+	}
+}
+
+// requestLSARebuild reconstruye y floodea el LSA propio, respetando un
+// debounce minimo para no inundar la red si varios vecinos cambian a la vez.
+func (n *Node) requestLSARebuild() {
+	n.mu.Lock()
+	elapsed := time.Since(n.lastLSARebuild)
+	if elapsed < n.LSARebuildDebounce {
+		wait := n.LSARebuildDebounce - elapsed
+		n.mu.Unlock()
+		time.AfterFunc(wait, n.buildAndFloodOwnLSA)
+		return
+	}
+	n.mu.Unlock()
+	n.buildAndFloodOwnLSA()
 }
 
 func (n *Node) buildAndFloodOwnLSA() {
 	links := map[string]int{}
-	n.mu.RLock()
+	n.mu.Lock()
+	n.lastLSARebuild = time.Now()
 	for _, neighbor := range n.Config.Neighbors {
 		if n.activeNeighbors[neighbor.ID()] {
 			links[neighbor.ID()] = neighbor.Cost
 		}
 	}
-	n.mu.RUnlock()
+	n.mu.Unlock()
 	if n.Config.AttachedHost != nil {
 		links[n.Config.AttachedHost.ID()] = n.Config.AttachedHost.Cost
 	}
@@ -177,6 +267,7 @@ func (n *Node) buildAndFloodOwnLSA() {
 	log.Printf("[ROUTER %s] LSA: %+v", n.Config.Name, lsa)
 	n.store.Record(n.Config.ID(), seq, links)
 	n.flood(lsa, "")
+	n.maybeRecomputeRoutes()
 }
 
 func (n *Node) onLSA(message map[string]interface{}) {
@@ -191,6 +282,7 @@ func (n *Node) onLSA(message map[string]interface{}) {
 	if n.store.Record(origin, seq, links) {
 		log.Printf("[NETWORK %s] LSA from %s stored -> flooding onward", n.Config.ID(), origin)
 		n.flood(lsa, sender)
+		n.maybeRecomputeRoutes()
 	} else {
 		log.Printf("[NETWORK %s] Ignoring LSA from %s (own or already known)", n.Config.ID(), origin)
 	}
@@ -207,15 +299,40 @@ func (n *Node) flood(lsa control.LSAMessage, excludeID string) {
 
 // -- convergencia -------------------------------------------------------------
 
-func (n *Node) convergenceTimer() {
-	time.Sleep(ConvergenceWaitS)
-	graph := n.store.Snapshot()
-	log.Printf("[ROUTER %s] Converged. Network graph: %+v", n.Config.Name, graph)
-	paths := algorithms.ShortestPaths(graph, n.Config.ID())
-	log.Printf("[ROUTER %s] Shortest paths (Dijkstra):", n.Config.Name)
-	for destination, result := range paths {
-		log.Printf("  %s: cost %d via %s", destination, result.Cost, result.NextHop)
+// convergenceLoop espera la convergencia inicial exigida por el enunciado
+// (30s) y calcula la primera tabla de ruteo; despues sigue recalculando cada
+// vez que cambia el grafo (maybeRecomputeRoutes) y, como respaldo, en cada
+// tick de RouteRecomputeInterval por si algun evento no disparo el recalculo.
+func (n *Node) convergenceLoop() {
+	time.Sleep(n.ConvergenceWait)
+	n.mu.Lock()
+	n.converged = true
+	n.mu.Unlock()
+	n.recomputeRoutes()
+	log.Printf("[ROUTER %s] Converged. Recomputando rutas ante cada cambio de topologia.", n.Config.Name)
+
+	ticker := time.NewTicker(n.RouteRecomputeInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		n.recomputeRoutes()
 	}
+}
+
+// maybeRecomputeRoutes recalcula de inmediato si ya paso la convergencia
+// inicial; antes de eso, la primera tabla la produce convergenceLoop segun
+// el tiempo de espera exigido por el enunciado.
+func (n *Node) maybeRecomputeRoutes() {
+	n.mu.RLock()
+	converged := n.converged
+	n.mu.RUnlock()
+	if converged {
+		n.recomputeRoutes()
+	}
+}
+
+func (n *Node) recomputeRoutes() {
+	graph := n.store.Snapshot()
+	paths := algorithms.ShortestPaths(graph, n.Config.ID())
 	routes := map[string]control.Route{}
 	for destination, result := range paths {
 		routes[destination] = control.Route{
@@ -225,15 +342,37 @@ func (n *Node) convergenceTimer() {
 			Cost:        result.Cost,
 		}
 	}
+
 	n.mu.Lock()
+	changed := !routesEqual(n.routes, routes)
 	n.routes = routes
 	n.mu.Unlock()
+	if !changed {
+		return
+	}
+
+	log.Printf("[ROUTER %s] Shortest paths (Dijkstra):", n.Config.Name)
+	for destination, result := range paths {
+		log.Printf("  %s: cost %d via %s", destination, result.Cost, result.NextHop)
+	}
 	if err := control.WriteRoutingTable(n.CSVPath, routes); err != nil {
 		log.Printf("[NETWORK %s] error escribiendo tabla de ruteo: %v", n.Config.ID(), err)
 		return
 	}
 	log.Printf("[NETWORK %s] Routing table written to %s", n.Config.ID(), n.CSVPath)
-	log.Printf("[ROUTER %s] Done (Ctrl-C to stop).", n.Config.Name)
+}
+
+func routesEqual(a, b map[string]control.Route) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for destination, routeA := range a {
+		routeB, ok := b[destination]
+		if !ok || routeA != routeB {
+			return false
+		}
+	}
+	return true
 }
 
 func (n *Node) portFor(nodeID string) int {

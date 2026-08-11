@@ -12,8 +12,8 @@ TARGETS = (
     ROOT / "figures" / "outcomes.png",
     ROOT / "go-side" / "router.exe",
     ROOT / "go-side" / "router",
-    *ROOT.glob("*_routing_table.csv"),
-    *ROOT.glob("python-side/*_routing_table.csv"),
+    *ROOT.glob("*_tabla_enrutamiento.csv"),
+    *ROOT.glob("python-side/*_tabla_enrutamiento.csv"),
 )
 
 for target in TARGETS:

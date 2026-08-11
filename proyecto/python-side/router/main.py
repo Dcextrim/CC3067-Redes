@@ -10,7 +10,7 @@ from router.node import Node
 
 
 def _prompt_config(name: str) -> NodeConfig:
-    print(f"[ROUTER {name}] No routing table found ({name}_routing_table.csv). Let's configure this node.")
+    print(f"[ROUTER {name}] No routing table found ({name}_tabla_enrutamiento.csv). Let's configure this node.")
     ip = input("This router's IP: ").strip() or "127.0.0.1"
     port = int(input("This router's listen port: ").strip())
     neighbors: list[Neighbor] = []

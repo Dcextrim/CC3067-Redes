@@ -31,7 +31,8 @@ make run-router-go CONFIG=U_config.json
 ```
 
 Al converger (30s tras arrancar), cada nodo escribe
-`<nombre>_routing_table.csv` con su tabla de ruteo.
+`<nombre>_tabla_enrutamiento.csv` con su tabla de ruteo, y sigue
+recalculandola cada vez que el grafo cambia (nuevo LSA, vecino caido).
 
 ### Cliente / servidor (hosts no-router)
 

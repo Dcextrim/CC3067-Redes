@@ -40,7 +40,7 @@ func promptConfig() router.NodeConfig {
 	}
 
 	name := prompt("Node name (a single letter, e.g. A): ")
-	fmt.Printf("[ROUTER %s] No routing table found (%s_routing_table.csv). Let's configure this node.\n", name, name)
+	fmt.Printf("[ROUTER %s] No routing table found (%s_tabla_enrutamiento.csv). Let's configure this node.\n", name, name)
 	ip := prompt("This router's IP: ")
 	if ip == "" {
 		ip = "127.0.0.1"

@@ -152,17 +152,29 @@ primer salto (siempre un vecino directo).
 | Evento | Regla |
 |---|---|
 | HELLO | Cada 10s. Primer envio inmediato al iniciar el nodo. |
-| LSA | Generar y floodear 5s despues del primer HELLO recibido. |
-| Convergencia | Esperar 30s antes de asumir que la tabla de ruteo es estable. |
+| LSA (inicial) | Generar y floodear 5s despues del primer HELLO recibido de cualquier vecino (exigido por el enunciado). |
+| LSA (por cambio de topologia) | Si un vecino inactivo vuelve a responder HELLO, o un vecino activo deja de responder (ver expiracion abajo), se reconstruye y floodea un LSA nuevo con `seq` incrementado. Con un debounce minimo de 3s para no inundar la red si varios cambios ocurren juntos. |
+| Expiracion de vecino | Si no llega HELLO de un vecino activo en 3 ciclos de HELLO (30s), se marca como caido (se retira de `links` en el proximo LSA propio). Revisado cada 5s. |
+| Convergencia inicial | Esperar 30s antes de calcular y escribir la primera tabla de ruteo (exigido por el enunciado). |
+| Recalculo de rutas | Tras la convergencia inicial, la tabla se recalcula de inmediato cada vez que cambia el grafo (LSA nuevo aceptado, vecino caido/recuperado) y, como respaldo, cada 15s. El CSV solo se reescribe si el resultado realmente cambio. |
 | Hamming | Solo en plano de datos (DATA). HELLO y LSA van en texto plano. |
-| Hilos | El nodo corre routing (control) y forwarding (datos) en hilos/goroutines separados, comunicados por colas internas; un tercer hilo de escucha acepta conexiones TCP y despacha cada mensaje a la cola que corresponda segun su `"type"`. |
+| Hilos | El nodo corre routing (control) y forwarding (datos) en hilos/goroutines separados, comunicados por colas internas; un hilo de escucha acepta conexiones TCP y despacha cada mensaje segun su `"type"`; un hilo adicional vigila la expiracion de vecinos y otro recalcula rutas periodicamente. |
 
 ## 6. Puertos
 
-**Pendiente de fijar** hasta confirmar el numero final de nodos de la
-topologia (ver nota del equipo sobre parejas incompletas). Cada nodo
-(router u host) usa un puerto TCP propio — indispensable en la fase de
-pruebas locales, donde todos comparten `127.0.0.1`. En Tailscale cada nodo
-tiene ademas una IP unica, por lo que los puertos podrian repetirse entre
-nodos sin ambiguedad, pero se recomienda mantener la asignacion 1 puerto
-por nodo para no tener que branchear logica entre las dos fases de prueba.
+Rango acordado entre las 2 parejas reales (ver `Lab3-Propuesta`): **5000-5007**
+para routers, un puerto TCP dedicado por nodo router (indispensable en la
+fase de pruebas locales, donde todos comparten `127.0.0.1`; en Tailscale
+cada nodo ademas tiene una IP unica, pero se mantiene 1 puerto por nodo para
+no branchear logica entre las dos fases). Los hosts adjuntos (cliente/servidor)
+usan un rango aparte, **6000+**, para no competir por los 8 puertos de router.
+
+Como el equipo confirmo con el profesor que puede operar como 2 parejas
+reales y simular la tercera corriendo nodos adicionales, propuesta de
+reparto (**a confirmar con Javier/Dilary antes de las pruebas**):
+
+| Bloque | Asignado a |
+|---|---|
+| 5000-5002 | Pareja 1 — Daniel Chet / Cristian Tunchez (hasta 3 routers) |
+| 5003-5005 | Pareja 2 — Javier Linares / Dilary Cruz (hasta 3 routers) |
+| 5006-5007 | Pareja 3 simulada (nodos extra, ejecutados por quien corra la prueba) |
