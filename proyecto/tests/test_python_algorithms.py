@@ -6,8 +6,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python-side"))
 
-from atm.algorithms import crc32, hamming  # noqa: E402
-from atm.layers import link, noise, presentation  # noqa: E402
+from router import codec  # noqa: E402
+from router.algorithms import dijkstra, hamming, noise  # noqa: E402
 
 
 class HammingTests(unittest.TestCase):
@@ -38,44 +38,24 @@ class HammingTests(unittest.TestCase):
             self.assertEqual(hamming.decode(encoded, length).data_bits, message)
 
 
-class CRC32Tests(unittest.TestCase):
-    """Vectores IEEE, padding corto y deteccion en datos/redundancia."""
+class CodecAndNoiseTests(unittest.TestCase):
+    """Contratos entre el codec ASCII<->bits y el simulador de ruido."""
 
-    def test_ieee_known_vector(self):
-        bits = presentation.codificar_mensaje("123456789")
-        self.assertEqual(crc32.calculate(bits), 0xCBF43926)
-        self.assertEqual(crc32.checksum_bits(bits), "11001011111101000011100100100110")
-
-    def test_short_input_is_padded_to_32_bits(self):
-        # Un bit 1 se representa como 0x80 00 00 00 despues del padding.
-        self.assertEqual(crc32.calculate("1"), 0xCC1D6927)
-
-    def test_detects_data_and_checksum_errors(self):
-        data = presentation.codificar_mensaje("ATM")
-        frame = crc32.encode(data)
-        for index in (0, len(data) - 1, len(frame) - 1):
-            corrupted = list(frame)
-            corrupted[index] = "1" if corrupted[index] == "0" else "0"
-            ok, _, _ = crc32.verify("".join(corrupted), len(data))
-            self.assertFalse(ok)
-
-
-class LayerTests(unittest.TestCase):
-    """Contratos entre Presentacion, Enlace y Ruido."""
-
-    def test_presentation_round_trip(self):
-        bits = presentation.codificar_mensaje("A bank message")
+    def test_codec_round_trip(self):
+        bits = codec.codificar_mensaje("A router message")
         self.assertEqual(bits[:8], "01000001")
-        self.assertEqual(presentation.decodificar_mensaje(bits), "A bank message")
+        self.assertEqual(codec.decodificar_mensaje(bits), "A router message")
 
-    def test_link_corrects_hamming(self):
-        data = presentation.codificar_mensaje("A")
-        frame = list(link.calcular_integridad(data, "hamming"))
+    def test_hamming_over_full_frame_after_noise(self):
+        # Simula el plano de datos: se codifica el frame completo, se le aplica
+        # ruido y un solo bit volteado debe seguir siendo corregible.
+        data = codec.codificar_mensaje('{"from":"A","to":"B","msg":"hi"}')
+        frame = list(hamming.encode(data))
         frame[4] = "1" if frame[4] == "0" else "0"
-        result = link.verificar_integridad("".join(frame), "hamming", len(data))
-        self.assertTrue(result.ok)
+        result = hamming.decode("".join(frame), len(data))
+        self.assertTrue(result.valid)
         self.assertTrue(result.corrected)
-        self.assertEqual(result.message_bits, data)
+        self.assertEqual(result.data_bits, data)
 
     def test_noise_rate_one_flips_all_bits(self):
         result, flips = noise.aplicar_ruido("001101", 1.0, random.Random(1))
@@ -84,6 +64,34 @@ class LayerTests(unittest.TestCase):
 
     def test_fraction_probability(self):
         self.assertAlmostEqual(noise.parse_probability("1/100"), 0.01)
+
+
+class DijkstraTests(unittest.TestCase):
+    """Grafo de ejemplo tomado del ejemplo del profesor (nodo U)."""
+
+    GRAPH = {
+        "U": {"X": 1, "Y": 1, "C": 1},
+        "X": {"U": 1, "Y": 1},
+        "Y": {"U": 1, "X": 1, "Z": 1},
+        "Z": {"Y": 1, "S": 1},
+        "C": {"U": 1},
+        "S": {"Z": 1},
+    }
+
+    def test_shortest_paths_from_u(self):
+        result = dijkstra.shortest_paths(self.GRAPH, "U")
+        self.assertEqual(result["C"].cost, 1)
+        self.assertEqual(result["X"].cost, 1)
+        self.assertEqual(result["Y"].cost, 1)
+        self.assertEqual(result["Z"].cost, 2)
+        self.assertEqual(result["S"].cost, 3)
+        self.assertEqual(result["Z"].next_hop, "Y")
+        self.assertEqual(result["S"].next_hop, "Y")
+
+    def test_unreachable_node_is_excluded(self):
+        graph = {"A": {"B": 1}, "B": {"A": 1}, "C": {}}
+        result = dijkstra.shortest_paths(graph, "A")
+        self.assertNotIn("C", result)
 
 
 if __name__ == "__main__":
