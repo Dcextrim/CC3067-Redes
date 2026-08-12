@@ -2,39 +2,43 @@ GO ?= go
 CONFIG ?= configs/local/A.json
 DESTINATION ?= 127.0.0.1:6001
 MESSAGE ?= hola
+NOISE ?= 0
 
-.PHONY: build build-router build-client build-server run-router run-client run-server test vectors local all clean
+.PHONY: build build-router build-client build-server run-router run-client run-server test vectors experiment local all clean
 
 build: build-router build-client build-server
 
 build-router:
-	cd go-side && $(GO) build -o router ./cmd/router
+	$(GO) build -o router ./cmd/router
 
 build-client:
-	cd go-side && $(GO) build -o client ./cmd/client
+	$(GO) build -o client ./cmd/client
 
 build-server:
-	cd go-side && $(GO) build -o server ./cmd/server
+	$(GO) build -o server ./cmd/server
 
 run-router:
-	cd go-side && $(GO) run ./cmd/router -config ../$(CONFIG)
+	$(GO) run ./cmd/router -config $(CONFIG) -noise $(NOISE)
 
 run-client:
-	cd go-side && $(GO) run ./cmd/client -to $(DESTINATION) -message "$(MESSAGE)"
+	$(GO) run ./cmd/client -to $(DESTINATION) -message "$(MESSAGE)" -noise $(NOISE)
 
 run-server:
-	cd go-side && $(GO) run ./cmd/server
+	$(GO) run ./cmd/server
 
 test:
-	cd go-side && $(GO) test -count=1 ./...
+	$(GO) test -count=1 ./...
 
 vectors:
-	cd go-side && $(GO) run ./cmd/vector-gen
+	$(GO) run ./cmd/vector-gen
+
+experiment:
+	$(GO) run ./cmd/experiment
 
 local:
 	powershell -ExecutionPolicy Bypass -File scripts/run_local_topology.ps1 -Message "$(MESSAGE)"
 
-all: vectors test build
+all: vectors experiment test build
 
 clean:
 	powershell -ExecutionPolicy Bypass -File scripts/clean_generated.ps1

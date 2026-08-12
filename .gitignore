@@ -1,12 +1,13 @@
 tmp/
 output/
-proyecto/go-side/bin/
-proyecto/go-side/router
-proyecto/go-side/router.exe
-proyecto/go-side/client
-proyecto/go-side/client.exe
-proyecto/go-side/server
-proyecto/go-side/server.exe
+proyecto/bin/
+proyecto/router
+proyecto/router.exe
+proyecto/client
+proyecto/client.exe
+proyecto/server
+proyecto/server.exe
+proyecto/configs/demo/
 *_tabla_enrutamiento.csv
 *:Zone.Identifier
 

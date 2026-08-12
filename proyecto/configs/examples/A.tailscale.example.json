@@ -1,0 +1,19 @@
+{
+  "name": "A",
+  "ip": "IP_LOCAL_TAILSCALE",
+  "port": 5000,
+  "noise_probability": 0,
+  "neighbors": [
+    {
+      "ip": "IP_REMOTA_TAILSCALE",
+      "port": 5003,
+      "cost": 1
+    }
+  ],
+  "attached_host": {
+    "role": "client",
+    "ip": "IP_LOCAL_TAILSCALE",
+    "port": 6000,
+    "cost": 1
+  }
+}

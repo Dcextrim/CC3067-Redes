@@ -4,14 +4,16 @@ param(
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$goRoot = Join-Path $projectRoot "go-side"
-$binRoot = Join-Path $goRoot "bin"
+$binRoot = Join-Path $projectRoot "bin"
 New-Item -ItemType Directory -Force -Path $binRoot | Out-Null
 
-Push-Location -LiteralPath $goRoot
+Push-Location -LiteralPath $projectRoot
 try {
     go run ./cmd/vector-gen
     if ($LASTEXITCODE -ne 0) { throw "No se pudieron generar los vectores canonicos" }
+
+    go run ./cmd/experiment
+    if ($LASTEXITCODE -ne 0) { throw "No se pudieron generar los resultados experimentales" }
 
     go test -count=1 ./...
     if ($LASTEXITCODE -ne 0) { throw "Fallaron las pruebas Go" }

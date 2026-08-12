@@ -1,9 +1,7 @@
 # Protocolo Link State — CC3067 Lab 3
 
 Este documento formaliza el protocolo implementado en Go por
-`go-side/internal/router`. Debe acordarse **sin cambios** con las demas parejas
-de la topologia (interoperabilidad exigida por el enunciado, seccion 3.3): la
-compatibilidad depende de este contrato de red y no del lenguaje usado por
+`internal/router`, la compatibilidad depende de este contrato de red y no del lenguaje usado por
 cada grupo.
 
 ## 1. Parametros generales
@@ -18,14 +16,10 @@ cada grupo.
 
 ### Por que `ip:puerto` y no solo IP
 
-La propuesta original identificaba nodos solo por IP de Tailscale. Eso
-funciona en la fase de red real (cada nodo tiene una IP de Tailscale unica),
-pero **rompe la fase de pruebas locales** que exige el enunciado ("nuestro
-medio de desarrollo sera nuestra computadora local"): en `127.0.0.1` todos
-los nodos comparten la misma IP y solo se distinguen por el puerto. Por eso
+en `127.0.0.1` todos los nodos comparten la misma IP y solo se distinguen por el puerto. Por eso
 el identificador canonico de cualquier nodo (router u host adjunto) es
-`f"{ip}:{port}"`, tanto en pruebas locales como en Tailscale (donde sigue
-siendo unico trivialmente, ya que ahi la IP sola ya lo era).
+`f"{ip}:{port}"`, tanto en pruebas locales como en Tailscale donde sigue
+siendo unico trivialmente, ya que ahi la IP sola ya lo era.
 
 ## 2. Configuracion de nodo (`config.json`)
 
@@ -34,6 +28,7 @@ siendo unico trivialmente, ya que ahi la IP sola ya lo era).
   "name": "A",
   "ip": "100.x.x.x",
   "port": 5000,
+  "noise_probability": 0,
   "neighbors": [
     { "ip": "100.y.y.y", "port": 5001, "cost": 2 },
     { "ip": "100.z.z.z", "port": 5002, "cost": 5 }
@@ -47,6 +42,14 @@ que usa a este nodo como puerta de enlace predeterminada (seccion 3.2 del
 enunciado). El host adjunto se agrega como un vecino mas al grafo de
 enrutamiento (con el costo indicado, 1 por defecto) — exactamente igual a
 como aparece un router vecino.
+
+`noise_probability` es local a cada router y admite un decimal entre 0 y 1.
+Se aplica de forma independiente a cada bit de DATA que ese router envia. Si
+se omite vale 0. En una terminal, si no se proporciona `-noise`, el programa
+pregunta si se desea activar la simulacion; Enter o `n` selecciona el modo sin
+ruido. `-noise 0` fuerza ese modo sin preguntar y `-noise 1/1000` activa la
+simulacion. La opcion no forma parte de los mensajes del protocolo, por lo que
+cada grupo puede elegirla sin romper interoperabilidad.
 
 ## 3. Tipos de mensaje
 
@@ -90,10 +93,8 @@ inunda a toda la red por flooding.
 
 ### C. DATA (datos)
 
-Transporta `{from, to, msg}` protegido con **Hamming(7,4) sobre el frame
-completo**, no solo sobre `msg`. Este es el punto que se corrigio respecto
-a la propuesta original tras aclaracion del profesor: los routers
-intermedios *deben* corregir errores sobre todos los bits recibidos antes
+Transporta `{from, to, msg}` protegido con Hamming(7,4) sobre el frame
+completo, no solo sobre `msg`. Los routers intermedios *deben* corregir errores sobre todos los bits recibidos antes
 de poder leer nada — pero solo **leen** el campo `to` para decidir el
 siguiente salto; nunca interpretan ni actuan sobre `msg`. Unicamente el
 destino final usa el contenido de `msg`.
@@ -115,7 +116,7 @@ bit volteado en todo el mensaje sin importar su longitud.
 - `len`: longitud en bits del frame *sin* redundancia ni relleno (necesaria
   para que Hamming sepa cuantos bloques esperar al decodificar).
 
-**Pipeline en cada router al recibir DATA** (igual al enunciado, seccion 3.2):
+**Pipeline en cada router al recibir DATA**:
 
 1. Recibir la cadena de bits (`bits`).
 2. Corregir errores sobre **todos** los bits (Hamming, usando `len`).
@@ -126,14 +127,18 @@ bit volteado en todo el mensaje sin importar su longitud.
 6. Obtener IP y puerto del siguiente salto.
 7. Re-serializar el mismo frame (sin tocar `msg`).
 8. Aplicar Hamming(7,4) de nuevo sobre el frame completo (nueva `bits`).
-9. Enviar por un socket TCP nuevo hacia el siguiente salto.
+9. Aplicar ruido a la trama ya protegida: cada bit, incluidos los de paridad,
+   se voltea independientemente con `noise_probability`.
+10. Enviar por un socket TCP nuevo hacia el siguiente salto.
 
-El re-empaquetado en los pasos 7-8 importa: si Hamming corrigio un bit en
+El re-empaquetado en los pasos 7-9 importa: si Hamming corrigio un bit en
 el paso 2, el frame reenviado queda "limpio" en vez de arrastrar errores
-previos — cada enlace obtiene su propia proteccion Hamming fresca.
+previos — cada enlace obtiene su propia proteccion Hamming fresca y una nueva
+aplicacion independiente de ruido.
 
 Hamming y LSA/HELLO **no** comparten tratamiento: HELLO y LSA viajan en
-texto plano JSON; Hamming se aplica unicamente al plano de datos (DATA).
+texto plano JSON; Hamming y el ruido simulado se aplican unicamente al plano
+de datos (DATA).
 
 ## 4. Tabla de ruteo generada
 
@@ -165,11 +170,12 @@ parcialmente escrito.
 | Convergencia inicial | Esperar 30s antes de calcular y escribir la primera tabla de ruteo (exigido por el enunciado). |
 | Recalculo de rutas | Tras la convergencia inicial, la tabla se recalcula de inmediato cada vez que cambia el grafo (LSA nuevo aceptado, vecino caido/recuperado) y, como respaldo, cada 15s. El CSV solo se reescribe si el resultado realmente cambio. |
 | Hamming | Solo en plano de datos (DATA). HELLO y LSA van en texto plano. |
+| Ruido | Se aplica despues de Hamming, antes de cada envio DATA; 0 por defecto. |
 | Concurrencia | El nodo Go corre routing (control) y forwarding (datos) en goroutines separadas, comunicadas por canales internos; otra goroutine acepta conexiones TCP, una vigila la expiracion de vecinos y otra recalcula rutas periodicamente. |
 
 ## 6. Puertos
 
-Rango acordado entre las 2 parejas reales (ver `Lab3-Propuesta`): **5000-5007**
+Rango acordado entre las 2 parejas reales: **5000-5007**
 para routers, un puerto TCP dedicado por nodo router (indispensable en la
 fase de pruebas locales, donde todos comparten `127.0.0.1`; en Tailscale
 cada nodo ademas tiene una IP unica, pero se mantiene 1 puerto por nodo para
@@ -177,8 +183,8 @@ no branchear logica entre las dos fases). Los hosts adjuntos (cliente/servidor)
 usan un rango aparte, **6000+**, para no competir por los 8 puertos de router.
 
 Como el equipo confirmo con el profesor que puede operar como 2 parejas
-reales y simular la tercera corriendo nodos adicionales, propuesta de
-reparto (**a confirmar con Javier/Dilary antes de las pruebas**):
+reales y simular la tercera corriendo nodos adicionales, se usa el siguiente
+reparto, validado en una prueba basica de interoperabilidad por Tailscale:
 
 | Bloque | Asignado a |
 |---|---|
@@ -188,15 +194,10 @@ reparto (**a confirmar con Javier/Dilary antes de las pruebas**):
 
 ## 7. Vectores canonicos de interoperabilidad
 
-`go-side/internal/router/testdata/protocol_vectors.json` contiene ejemplos
+`internal/router/testdata/protocol_vectors.json` contiene ejemplos
 canonicos y autocontenidos de:
 
 - HELLO y LSA serializados como JSON UTF-8 compacto.
 - El vector manual Hamming(7,4) `1011 -> 0110011`.
 - Un payload `{from,to,msg}`, sus bits UTF-8, el envelope DATA protegido y su
   JSON exterior.
-
-Cada grupo puede decodificar estos valores con su propio lenguaje para validar
-compatibilidad sin ejecutar nuestro codigo. El archivo se regenera con
-`go run ./cmd/vector-gen` desde `go-side/` y la suite comprueba que no se haya
-desviado del protocolo.

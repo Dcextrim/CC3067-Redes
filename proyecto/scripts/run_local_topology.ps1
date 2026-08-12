@@ -4,7 +4,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$goRoot = Join-Path $projectRoot "go-side"
 $configRoot = Join-Path $projectRoot "configs\local"
 $runStamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $runRoot = Join-Path $projectRoot "tmp\local_topology\$runStamp"
@@ -15,7 +14,7 @@ $routerExe = Join-Path $binRoot "router.exe"
 $clientExe = Join-Path $binRoot "client.exe"
 $serverExe = Join-Path $binRoot "server.exe"
 
-Push-Location -LiteralPath $goRoot
+Push-Location -LiteralPath $projectRoot
 try {
     go build -o $routerExe ./cmd/router
     if ($LASTEXITCODE -ne 0) { throw "No se pudo compilar router" }
@@ -47,7 +46,7 @@ try {
     foreach ($name in @("A", "B", "C", "D", "E", "F")) {
         $stdout = Join-Path $runRoot "$name.out.log"
         $stderr = Join-Path $runRoot "$name.err.log"
-        $process = Start-Process -FilePath $routerExe -ArgumentList @("-config", "$name.json") `
+        $process = Start-Process -FilePath $routerExe -ArgumentList @("-config", "$name.json", "-noise", "0") `
             -WorkingDirectory $runRoot -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
             -WindowStyle Hidden -PassThru
         $processes += $process
@@ -71,7 +70,7 @@ try {
     }
 
     & $clientExe -ip 127.0.0.1 -port 6000 -gateway-ip 127.0.0.1 -gateway-port 5000 `
-        -to 127.0.0.1:6001 -message $Message
+        -to 127.0.0.1:6001 -message $Message -noise 0
     if ($LASTEXITCODE -ne 0) { throw "El cliente no pudo enviar el mensaje" }
 
     Start-Sleep -Seconds 2

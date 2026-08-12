@@ -1,15 +1,14 @@
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$goRoot = Join-Path $projectRoot "go-side"
 
 $explicitTargets = @(
-    (Join-Path $goRoot "bin"),
-    (Join-Path $goRoot "router"),
-    (Join-Path $goRoot "router.exe"),
-    (Join-Path $goRoot "client"),
-    (Join-Path $goRoot "client.exe"),
-    (Join-Path $goRoot "server"),
-    (Join-Path $goRoot "server.exe"),
+    (Join-Path $projectRoot "bin"),
+    (Join-Path $projectRoot "router"),
+    (Join-Path $projectRoot "router.exe"),
+    (Join-Path $projectRoot "client"),
+    (Join-Path $projectRoot "client.exe"),
+    (Join-Path $projectRoot "server"),
+    (Join-Path $projectRoot "server.exe"),
     (Join-Path $projectRoot "tmp\local_topology")
 )
 
@@ -25,3 +24,10 @@ Get-ChildItem -LiteralPath $projectRoot -Filter "*_tabla_enrutamiento.csv" -File
         Remove-Item -LiteralPath $_.FullName -Force
         Write-Host "Eliminado: $($_.FullName)"
     }
+
+$tmpRoot = Join-Path $projectRoot "tmp"
+if ((Test-Path -LiteralPath $tmpRoot) -and
+    @(Get-ChildItem -LiteralPath $tmpRoot -Force -ErrorAction SilentlyContinue).Count -eq 0) {
+    Remove-Item -LiteralPath $tmpRoot -Force
+    Write-Host "Eliminado directorio temporal vacio: $tmpRoot"
+}

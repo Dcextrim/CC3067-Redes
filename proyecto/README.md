@@ -1,20 +1,23 @@
 # Router Link State en Go
 
-Implementacion del Laboratorio 3 de CC3067. Cada router ejecuta en paralelo el
-plano de control —HELLO, LSA, flooding, expiracion de vecinos y Dijkstra— y el
+Cada router ejecuta en paralelo el plano de control —HELLO, LSA, flooding, expiracion de vecinos y Dijkstra— y el
 plano de datos —lectura del CSV, Hamming(7,4) y forwarding por TCP—.
 
 ## Estructura
 
-- `go-side/cmd/router`: proceso router configurable.
-- `go-side/cmd/client`: host cliente que envia DATA a su gateway.
-- `go-side/cmd/server`: host servidor que recibe DATA desde su gateway.
-- `go-side/internal/router`: protocolo, algoritmos y pruebas Go.
+- `cmd/router`: proceso router configurable.
+- `cmd/client`: host cliente que envia DATA a su gateway.
+- `cmd/server`: host servidor que recibe DATA desde su gateway.
+- `cmd/experiment`: simulacion reproducible del canal ruidoso y Hamming.
+- `internal/router`: protocolo, algoritmos y pruebas Go.
 - `configs/local`: topologia reproducible de seis routers A-F.
+- `configs/examples`: configuraciones sanitizadas para adaptar a Tailscale.
+- `configs/demo`: configuraciones reales locales, ignoradas por Git.
 - `docs/protocol.md`: contrato JSON que deben compartir las otras parejas.
-- `go-side/internal/router/testdata/protocol_vectors.json`: vectores canonicos
+- `internal/router/testdata/protocol_vectors.json`: vectores canonicos
   independientes del lenguaje.
-- `data/` y `figures/`: resultados experimentales conservados para el reporte.
+- `experiments/data` y `experiments/figures`: resultados reproducibles y
+  graficas SVG generadas con Go.
 
 ## Requisitos
 
@@ -28,9 +31,8 @@ No se requiere instalar dependencias externas.
 Desde `proyecto/`:
 
 ```powershell
-cd go-side
 go test -count=1 ./...
-go build ./cmd/router ./cmd/client ./cmd/server
+go build ./...
 ```
 
 O ejecutar toda la validacion corta:
@@ -48,16 +50,41 @@ los vectores canonicos de interoperabilidad.
 Sin archivo, el programa solicita nombre, IP, puerto, vecinos y host adjunto:
 
 ```powershell
-cd go-side
 go run ./cmd/router
 ```
 
 Con configuracion JSON:
 
 ```powershell
-cd go-side
-go run ./cmd/router -config ../configs/local/A.json
+go run ./cmd/router -config configs/local/A.json
 ```
+
+Al iniciar desde una terminal aparece esta eleccion:
+
+```text
+¿Activar simulacion de ruido en DATA? [s/N]:
+```
+
+Presione Enter o escriba `n` para usar la version sin ruido que ya fue probada
+con la otra pareja. Esa es la opcion predeterminada. Si escribe `s`, puede
+aceptar la probabilidad recomendada `1/1000` o ingresar otra.
+
+Tambien se puede escoger el modo directamente, sin pregunta. Para la prueba de
+interoperabilidad estable:
+
+```powershell
+go run ./cmd/router -config configs/local/A.json -noise 0
+```
+
+Para activar la simulacion opcional:
+
+```powershell
+go run ./cmd/router -config configs/local/A.json -noise 1/1000
+```
+
+La misma opcion puede guardarse como `"noise_probability": 0.001` en el JSON.
+El ruido se aplica despues de Hamming en cada enlace DATA; HELLO y LSA no se
+alteran.
 
 Al converger escribe `<nombre>_tabla_enrutamiento.csv`. Cuando cambia la
 topologia vuelve a anunciar su LSA, recalcula Dijkstra y reemplaza el CSV de
@@ -68,18 +95,21 @@ forma atomica. Cada trama DATA consulta literalmente ese archivo.
 Servidor adjunto al router F:
 
 ```powershell
-cd go-side
 go run ./cmd/server -ip 127.0.0.1 -port 6001
 ```
 
 Cliente adjunto al router A:
 
 ```powershell
-cd go-side
 go run ./cmd/client -ip 127.0.0.1 -port 6000 `
   -gateway-ip 127.0.0.1 -gateway-port 5000 `
   -to 127.0.0.1:6001 -message "hola"
 ```
+
+El cliente hace la misma pregunta. Presione Enter para enviar sin ruido. El
+cliente tambien representa un enlace y solo aplica ruido antes de enviar al
+gateway cuando se elige esa version. Use `-noise 0` para automatizar una prueba
+determinista sin preguntas.
 
 ## Topologia local completa
 
@@ -100,19 +130,31 @@ El protocolo de red esta especificado en `docs/protocol.md`. Otros equipos
 pueden validar su implementacion con:
 
 ```text
-go-side/internal/router/testdata/protocol_vectors.json
+internal/router/testdata/protocol_vectors.json
 ```
 
 El archivo contiene JSON canonico para HELLO, LSA y DATA, un vector manual de
 Hamming(7,4), los bits UTF-8 y el envelope completo. Se regenera con:
 
 ```powershell
-cd go-side
 go run ./cmd/vector-gen
 ```
 
-## Pendiente externo
+## Experimento de ruido
 
-- Acordar el protocolo final con las otras parejas antes de la prueba en clase.
-- Sustituir `127.0.0.1` por las IP de Tailscale en configuraciones de despliegue.
-- Incorporar el reporte final PDF en `informe/`.
+Los CSV y SVG usados para analizar Hamming se regeneran con el mismo codigo Go
+del proyecto:
+
+```powershell
+go run ./cmd/experiment
+```
+
+La corrida usa una semilla fija, 25 condiciones y 7500 transmisiones. Consulte
+`experiments/README.md` para interpretar las columnas y la limitacion ante
+varios flips dentro del mismo bloque de siete bits.
+
+La interoperabilidad basica ya fue validada por Tailscale con un router remoto
+y su servidor adjunto: HELLO, LSA, Dijkstra, CSV, Hamming y DATA funcionaron
+entre ambas implementaciones. Para repetir una prueba, copie
+`configs/examples/A.tailscale.example.json` a `configs/demo/A.json` y sustituya
+las IP de ejemplo; `configs/demo/` no se versiona.

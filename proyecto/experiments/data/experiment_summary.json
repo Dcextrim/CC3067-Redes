@@ -1,0 +1,23 @@
+{
+  "seed": 3067,
+  "trials_per_combination": 300,
+  "combinations": 25,
+  "total_transmissions": 7500,
+  "frame_sizes_bytes": [
+    64,
+    128,
+    256,
+    512,
+    1024
+  ],
+  "error_rates": [
+    0,
+    0.001,
+    0.005,
+    0.01,
+    0.02
+  ],
+  "algorithm": "Hamming(7,4) por bloques",
+  "noise_model": "flip independiente por bit",
+  "generator": "Go"
+}
