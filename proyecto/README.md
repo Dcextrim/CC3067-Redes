@@ -6,8 +6,10 @@ plano de datos —lectura del CSV, Hamming(7,4) y forwarding por TCP—.
 ## Estructura
 
 - `cmd/router`: proceso router configurable.
-- `cmd/client`: host cliente que envia DATA a su gateway.
-- `cmd/server`: host servidor que recibe DATA desde su gateway.
+- `cmd/client`: host cliente generico que envia DATA a su gateway.
+- `cmd/server`: host servidor generico que recibe DATA desde su gateway.
+- `cmd/atm`: cajero (ATM) del Lab 2, retomado sobre el plano de datos actual.
+- `cmd/bank`: servidor bancario del Lab 2, retomado sobre el plano de datos actual.
 - `cmd/experiment`: simulacion reproducible del canal ruidoso y Hamming.
 - `internal/router`: protocolo, algoritmos y pruebas Go.
 - `configs/local`: topologia reproducible de seis routers A-F.
@@ -110,6 +112,41 @@ El cliente hace la misma pregunta. Presione Enter para enviar sin ruido. El
 cliente tambien representa un enlace y solo aplica ruido antes de enviar al
 gateway cuando se elige esa version. Use `-noise 0` para automatizar una prueba
 determinista sin preguntas.
+
+## Cajero y banco (ATM/Bank)
+
+El proceso del ATM y del servidor bancario del Lab 2 (login, retiro,
+logout) se retomaron sobre este plano de datos: ambos son `attached_host`
+(roles `atm`/`bank` en `configs/local/A.json` y `configs/local/F.json`) que
+hablan el protocolo descrito en `docs/protocol.md` seccion 3.D dentro del
+campo `msg` de cada DATA. Ver ese documento para el formato exacto de los
+comandos/respuestas.
+
+Banco adjunto al router F:
+
+```powershell
+go run ./cmd/bank -ip 127.0.0.1 -port 6001 -gateway-ip 127.0.0.1 -gateway-port 5005
+```
+
+Cajero adjunto al router A:
+
+```powershell
+go run ./cmd/atm -ip 127.0.0.1 -port 6000 `
+  -gateway-ip 127.0.0.1 -gateway-port 5000 `
+  -bank 127.0.0.1:6001
+```
+
+El cajero pide tarjeta y PIN hasta autenticarse (`LOGIN_OK`), y luego ofrece
+un menu de retiro/salida. Las cuentas de demostracion son las mismas dos del
+Lab 2 (`4111111111111111`/`1234`, saldo 500.00; `5500005555555559`/`0000`,
+saldo 1200.50). Ambos procesos aceptan `-noise` igual que `cmd/client`.
+
+También hay atajos de Makefile con los mismos valores por defecto:
+
+```powershell
+make run-bank
+make run-atm
+```
 
 ## Topologia local completa
 

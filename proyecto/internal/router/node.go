@@ -519,6 +519,7 @@ func (n *Node) forwardingLoop() {
 				if flips > 0 {
 					log.Printf("[NETWORK %s] ruido DATA hacia %s:%d: %d bits alterados (p=%g)", n.Config.ID(), ip, port, flips, n.Config.NoiseProbability)
 				}
+				log.Printf("[NETWORK %s] DATA reenviada -> siguiente salto %s:%d", n.Config.ID(), ip, port)
 				n.SendMessage(ip, port, noisy)
 			}
 			if err := forwarding.ForwardUsingRoutingTable(envelope, n.CSVPath, send); err != nil {

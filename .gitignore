@@ -7,6 +7,10 @@ proyecto/client
 proyecto/client.exe
 proyecto/server
 proyecto/server.exe
+proyecto/atm
+proyecto/atm.exe
+proyecto/bank
+proyecto/bank.exe
 proyecto/configs/demo/
 *_tabla_enrutamiento.csv
 *:Zone.Identifier

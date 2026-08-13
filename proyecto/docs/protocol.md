@@ -140,6 +140,48 @@ Hamming y LSA/HELLO **no** comparten tratamiento: HELLO y LSA viajan en
 texto plano JSON; Hamming y el ruido simulado se aplican unicamente al plano
 de datos (DATA).
 
+### D. Aplicacion Cajero/Banco (contenido de `msg`)
+
+El ATM y el servidor bancario del Lab 2 se retomaron para este laboratorio
+como dos `attached_host` ordinarios (uno de rol `atm`, otro de rol `bank`),
+cada uno conectado a su propio router-gateway igual que cualquier otro host
+adjunto (seccion 2). No se abre una conexion TCP persistente entre ambos
+como en el Lab 2: cada comando/respuesta es un DATA independiente que viaja
+por el plano de datos ya descrito arriba, con el texto del comando en el
+campo `msg` de `{from,to,msg}`. Los routers intermedios nunca interpretan
+este texto (solo leen `to`, como en cualquier DATA).
+
+Comandos que envia el cajero (`internal/atm.Request`/`ParseRequest`):
+
+```
+LOGIN|<tarjeta>|<pin>
+WITHDRAW|<monto>
+LOGOUT
+```
+
+Respuestas que envia el banco (`internal/atm.Response.Encode`):
+
+```
+LOGIN_OK|<mensaje>
+LOGIN_DENIED|<mensaje>
+WITHDRAW_OK|<monto>|<saldo>
+WITHDRAW_ERROR|<mensaje>
+LOGOUT_OK|<mensaje>
+ERROR|<mensaje>
+```
+
+El banco (`cmd/bank`, logica en `internal/atm.Bank`) mantiene dos cuentas de
+demostracion identicas a las del Lab 2 y una sesion autenticada por cajero,
+indexada por el `from` (`ip:puerto`) del cajero — en el Lab 2 la sesion vivia
+implicita en la conexion TCP; aqui se guarda explicitamente porque cada DATA
+es independiente. El cajero (`cmd/atm`) corre su propio listener
+(`router.RunServer`) en segundo plano para recibir la respuesta a cada
+comando que envia por su gateway.
+
+Este formato de aplicacion es interno a este equipo (ATM y banco propios);
+no forma parte del contrato de interoperabilidad entre parejas, que se
+limita al envoltorio DATA/HELLO/LSA de las secciones A-C.
+
 ## 4. Tabla de ruteo generada
 
 `<nombre_nodo>_tabla_enrutamiento.csv`, escrita por el plano de control una
