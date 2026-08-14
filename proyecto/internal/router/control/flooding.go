@@ -27,6 +27,13 @@ func (s *LinkStateStore) NextSeq() int {
 	return s.seq
 }
 
+// CurrentSeq retorna el ultimo numero de secuencia usado, sin incrementarlo.
+func (s *LinkStateStore) CurrentSeq() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.seq
+}
+
 // Record registra un LSA solo si su secuencia es mayor que la ultima aceptada
 // para el mismo origen. Esto evita que un paquete atrasado revierta el grafo a
 // un estado obsoleto despues de haber procesado un LSA mas reciente.

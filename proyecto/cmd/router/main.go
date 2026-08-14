@@ -17,6 +17,7 @@ import (
 func main() {
 	configPath := flag.String("config", "", "Ruta a un config.json; si se omite, se pide interactivamente")
 	noiseOverride := flag.String("noise", "", "probabilidad DATA: decimal o fraccion; reemplaza el valor del config")
+	statusPort := flag.Int("status-port", -1, "puerto HTTP opcional para /status y /send, fuera del protocolo (monitoreo externo); -1 = puerto+2000 automatico, 0 = desactivado")
 	flag.Parse()
 
 	reader := bufio.NewReader(os.Stdin)
@@ -46,7 +47,17 @@ func main() {
 	}
 	commandui.PrintNoiseMode(os.Stdout, config.NoiseProbability)
 
-	router.NewNode(config, "").RunForever()
+	effectiveStatusPort := *statusPort
+	if effectiveStatusPort == -1 {
+		effectiveStatusPort = config.Port + 2000
+	}
+
+	node := router.NewNode(config, "")
+	if effectiveStatusPort != 0 {
+		node.StartStatusServer(effectiveStatusPort)
+		fmt.Printf("[STATUS] http://%s:%d/status (sin autenticacion, fuera del protocolo)\n", config.IP, effectiveStatusPort)
+	}
+	node.RunForever()
 }
 
 func promptConfig(reader *bufio.Reader) router.NodeConfig {
