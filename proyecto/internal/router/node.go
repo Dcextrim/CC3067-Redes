@@ -265,6 +265,12 @@ func (n *Node) onHello(sender string) {
 	if !firstTime {
 		return
 	}
+	// Este vecino especifico recien aparece (primera vez o recuperado): puede
+	// no conocer LSA que este nodo ya acepto hace tiempo y que nadie ha tenido
+	// motivo de volver a floodear. Sin este resync, un vecino que se reincorpora
+	// se queda ciego ante partes de la red (routers y hosts adjuntos) que no
+	// cambiaron de estado desde su ultima flood original.
+	n.syncLSADatabaseTo(sender)
 	if isVeryFirstHello {
 		log.Printf("[ROUTER %s] Waiting %s before building the LSA...", n.Config.Name, n.LSADelayAfterFirstHello)
 		time.AfterFunc(n.LSADelayAfterFirstHello, n.buildAndFloodOwnLSA)
@@ -273,6 +279,27 @@ func (n *Node) onHello(sender string) {
 	// Un vecino que ya habia caido volvio a responder: no es el primer HELLO
 	// del nodo, pero si cambia la topologia -> hay que avisar con un LSA nuevo.
 	n.requestLSARebuild()
+}
+
+// syncLSADatabaseTo reenvia directamente a neighborID cada LSA que este nodo
+// ya tiene guardada (ver LinkStateStore.AllRecords). El receptor las procesa
+// con su onLSA normal: las que ya conoce se descartan por seq, las nuevas se
+// aceptan y siguen propagandose como cualquier LSA recien aprendida.
+func (n *Node) syncLSADatabaseTo(neighborID string) {
+	var target *Neighbor
+	for i := range n.Config.Neighbors {
+		if n.Config.Neighbors[i].ID() == neighborID {
+			target = &n.Config.Neighbors[i]
+			break
+		}
+	}
+	if target == nil {
+		return
+	}
+	for _, lsa := range n.store.AllRecords() {
+		lsa.From = n.Config.ID()
+		n.SendMessage(target.IP, target.Port, lsa)
+	}
 }
 
 // neighborWatchdog vigila que los vecinos activos sigan enviando HELLO; si

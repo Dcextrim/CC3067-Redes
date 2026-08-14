@@ -59,3 +59,24 @@ func (s *LinkStateStore) Snapshot() map[string]map[string]int {
 	}
 	return snapshot
 }
+
+// AllRecords retorna cada LSA conocida (origen, secuencia y links) tal como
+// esta guardada actualmente. Sirve para re-enviarle a un vecino que recien
+// aparece (primera vez o recuperado de una caida) todo lo que este nodo ya
+// sabe: sin esto, ese vecino nunca aprenderia sobre routers que no tuvieron
+// motivo propio para volver a floodear su LSA (p.ej. un host adjunto detras
+// de un router que nunca cambio de estado) desde antes de que el vecino se
+// reincorporara.
+func (s *LinkStateStore) AllRecords() []LSAMessage {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]LSAMessage, 0, len(s.graph))
+	for origin, links := range s.graph {
+		copied := make(map[string]int, len(links))
+		for k, v := range links {
+			copied[k] = v
+		}
+		result = append(result, LSAMessage{Type: LSA, Origin: origin, Seq: s.latestSeq[origin], Links: copied})
+	}
+	return result
+}
