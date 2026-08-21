@@ -3,11 +3,11 @@ const especificaciones = require('./data/especificaciones.json');
 const inventario = require('./data/inventario.json');
 
 function consultarSpecs(modelo) {
-    return especificaciones[modelo] || { error: "Modelo no encontrado en catálogo de demostración." };
+    return especificaciones[modelo] || { error: "Modelo no encontrado en catálogo." };
 }
 
 function diagnosticarFalla(codigo, modelo) {
-    const resultado = diagnosticos[codigo] || { error: "Código no documentado en el prototipo." };
+    const resultado = diagnosticos[codigo] || { error: "Código no documentado." };
     resultado.modelo_evaluado = modelo;
     return resultado;
 }
@@ -39,7 +39,7 @@ function registrarLectura(numero_serie, tipo, valor, unidad) {
     };
 }
 
-// Exportamos las funciones para poder usarlas en server.js
+// Se exportan las funciones para server.js
 module.exports = {
     consultarSpecs,
     diagnosticarFalla,

@@ -1,17 +1,16 @@
-// Importamos nuestras herramientas desde el archivo modular
+// Importar las herramientas
 const herramientas = require('./herramientas.js');
 
-// Función segura para enviar respuestas por stdout
+// Enviar las respuestas por stdout
 function sendResponse(response) {
     process.stdout.write(JSON.stringify(response) + '\n');
 }
 
-// Función para enviar errores JSON-RPC
+// Enviar errores JSON-RPC
 function sendError(id, code, message) {
     sendResponse({ jsonrpc: "2.0", id, error: { code, message } });
 }
 
-// Se escuchan los mensajes del cliente MCP (Anfitrión)
 process.stdin.on('data', (data) => {
     const mensajes = data.toString().split('\n');
     for (const mensaje of mensajes) {
@@ -21,7 +20,7 @@ process.stdin.on('data', (data) => {
             const req = JSON.parse(mensaje);
             
             // ==========================================
-            // 1. Fase de Inicialización
+            // 1. Inicialización
             // ==========================================
             if (req.method === 'initialize') {
                 sendResponse({
@@ -38,7 +37,7 @@ process.stdin.on('data', (data) => {
             }
             
             // ==========================================
-            // 2. Fase de Listado de Herramientas
+            // 2. Listado de Herramientas
             // ==========================================
             else if (req.method === 'tools/list') {
                 sendResponse({
@@ -108,7 +107,7 @@ process.stdin.on('data', (data) => {
             }
             
             // ==========================================
-            // 3. Fase de Ejecución de Herramientas
+            // 3. Ejecución de Herramientas
             // ==========================================
             else if (req.method === 'tools/call') {
                 const toolName = req.params.name;
@@ -132,11 +131,12 @@ process.stdin.on('data', (data) => {
                         resultado = herramientas.registrarLectura(args.numero_serie, args.tipo, args.valor, args.unidad);
                         break;
                     default:
+                        // Si no existe la herramienta se termina la ejecucion
                         sendError(req.id, -32601, "Herramienta no encontrada");
-                        return; // Si no existe la herramienta se termin la ejecucion
+                        return; 
                 }
 
-                // Enviar la respuesta como lo exige MCP
+                // Se envia la respuesta en el formato Json-RPC 2.0 con el resultado de la herramienta
                 sendResponse({
                     jsonrpc: "2.0",
                     id: req.id,
@@ -150,7 +150,7 @@ process.stdin.on('data', (data) => {
                 if (req.id) sendError(req.id, -32601, "Method not found");
             }
         } catch (e) {
-            // Si hay errores se imprimen logs en la terminal sin afectar el protocolo stdout
+            // Si hay errores se imprimen logs en la terminal sin afectar el protocolo
             console.error("Error procesando mensaje:", e);
         }
     }
