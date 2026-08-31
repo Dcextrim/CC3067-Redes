@@ -1,0 +1,14 @@
+{
+  "intervalo_horas": 3000,
+  "umbral_proximo_horas": 200,
+  "equipos": {
+    "KC-2291": {
+      "modelo": "SM 13",
+      "ultimo_servicio_horas": 3000
+    },
+    "KC-4402": {
+      "modelo": "SK 25",
+      "ultimo_servicio_horas": 0
+    }
+  }
+}

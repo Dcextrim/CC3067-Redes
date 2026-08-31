@@ -37,6 +37,37 @@
     "requiere_servicio_autorizado": false,
     "fuente": "SIGMA CONTROL 2 Manual"
   },
+  "0015 A": {
+    "tipo": "Alarma",
+    "descripcion": "Airend discharge temperature ADT high",
+    "causas_probables": [
+      "Se supero la temperatura final de compresion maxima permitida (ADT)."
+    ],
+    "acciones": [
+      "Mantener las condiciones ambientales dentro de los limites especificados.",
+      "Limpiar el enfriador.",
+      "Comprobar el nivel de aceite refrigerante."
+    ],
+    "requiere_servicio_autorizado": false,
+    "fuente": "SIGMA CONTROL 2 SCREW FLUID >=4.5.X User Manual, section 10.2, p. 196"
+  },
+  "0044 A": {
+    "tipo": "Alarma",
+    "descripcion": "No pressure buildup",
+    "causas_probables": [
+      "La maquina no produce aire comprimido.",
+      "La presion de trabajo no supera 50 psig dentro del periodo configurado.",
+      "La maquina no entra en modo LOAD.",
+      "La valvula de presion minima o de retencion esta defectuosa."
+    ],
+    "acciones": [
+      "Comprobar si la maquina tiene fugas.",
+      "Comprobar el acoplamiento y la correa trapezoidal.",
+      "Contactar a un representante de servicio autorizado de KAESER."
+    ],
+    "requiere_servicio_autorizado": true,
+    "fuente": "SIGMA CONTROL 2 SCREW FLUID >=4.5.X User Manual, section 10.2, p. 197"
+  },
   "0064 A": {
     "tipo": "Alarma",
     "descripcion": "Refrigeration dryer compressor motor temperature ⇞",

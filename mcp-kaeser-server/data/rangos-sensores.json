@@ -1,0 +1,12 @@
+{
+  "presion": {
+    "min": 5.5,
+    "max": 8,
+    "unidad": "bar"
+  },
+  "temperatura": {
+    "min": 10,
+    "max": 90,
+    "unidad": "degC"
+  }
+}

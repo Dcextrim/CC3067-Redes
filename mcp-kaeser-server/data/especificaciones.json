@@ -368,5 +368,174 @@
     "potencia_kw": 5.5,
     "dimensiones_mm": "620x980x1480",
     "fuente": "KAESER Technical specifications"
+  },
+  "SM 13 SFC": {
+    "familia": "SM",
+    "configuracion": "Variable speed (SFC)",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": {
+      "min": 0.39,
+      "max": 1.4
+    },
+    "presion_max_bar": 8.0,
+    "potencia_kw": 7.5,
+    "dimensiones_mm": "630x790x1100",
+    "fuente": "KAESER SM Series technical specifications"
+  },
+  "SM 13 T SFC": {
+    "familia": "SM",
+    "configuracion": "Dryer + variable speed (T SFC)",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": {
+      "min": 0.39,
+      "max": 1.4
+    },
+    "presion_max_bar": 8.0,
+    "potencia_kw": 7.5,
+    "dimensiones_mm": "630x1090x1100",
+    "fuente": "KAESER SM Series technical specifications"
+  },
+  "AIRCENTER 13 SFC": {
+    "familia": "SM",
+    "configuracion": "Aircenter + variable speed",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": {
+      "min": 0.39,
+      "max": 1.4
+    },
+    "presion_max_bar": 8.0,
+    "potencia_kw": 7.5,
+    "dimensiones_mm": "630x1220x1720",
+    "fuente": "KAESER SM Series technical specifications"
+  },
+  "SK 22 SFC": {
+    "familia": "SK",
+    "configuracion": "Variable speed (SFC)",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": {
+      "min": 0.63,
+      "max": 1.99
+    },
+    "presion_max_bar": 8.0,
+    "potencia_kw": 11.0,
+    "dimensiones_mm": "750x895x1260",
+    "fuente": "KAESER SK Series technical data"
+  },
+  "SK 25 SFC": {
+    "familia": "SK",
+    "configuracion": "Variable speed (SFC)",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": {
+      "min": 0.82,
+      "max": 2.57
+    },
+    "presion_max_bar": 8.0,
+    "potencia_kw": 15.0,
+    "dimensiones_mm": "750x895x1260",
+    "fuente": "KAESER SK Series technical data"
+  },
+  "SK 22 T SFC": {
+    "familia": "SK",
+    "configuracion": "Dryer + variable speed (T SFC)",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": {
+      "min": 0.63,
+      "max": 1.99
+    },
+    "presion_max_bar": 8.0,
+    "potencia_kw": 11.0,
+    "dimensiones_mm": "750x1240x1260",
+    "fuente": "KAESER SK Series technical data"
+  },
+  "SK 25 T SFC": {
+    "familia": "SK",
+    "configuracion": "Dryer + variable speed (T SFC)",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": {
+      "min": 0.82,
+      "max": 2.57
+    },
+    "presion_max_bar": 8.0,
+    "potencia_kw": 15.0,
+    "dimensiones_mm": "750x1240x1260",
+    "fuente": "KAESER SK Series technical data"
+  },
+  "AIRCENTER 22 SFC": {
+    "familia": "SK",
+    "configuracion": "Aircenter + variable speed",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": {
+      "min": 0.63,
+      "max": 1.99
+    },
+    "presion_max_bar": 8.0,
+    "potencia_kw": 11.0,
+    "dimensiones_mm": "750x1335x1880",
+    "fuente": "KAESER SK Series technical data"
+  },
+  "AIRCENTER 25 SFC": {
+    "familia": "SK",
+    "configuracion": "Aircenter + variable speed",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": {
+      "min": 0.82,
+      "max": 2.57
+    },
+    "presion_max_bar": 8.0,
+    "potencia_kw": 15.0,
+    "dimensiones_mm": "750x1335x1880",
+    "fuente": "KAESER SK Series technical data"
+  },
+  "ASK 34 SFC": {
+    "familia": "ASK",
+    "configuracion": "Variable speed (SFC)",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": {
+      "min": 0.94,
+      "max": 3.6
+    },
+    "presion_max_bar": 8.0,
+    "potencia_kw": 18.5,
+    "dimensiones_mm": "800x1110x1530",
+    "fuente": "KAESER ASK Series technical data"
+  },
+  "ASK 40 SFC": {
+    "familia": "ASK",
+    "configuracion": "Variable speed (SFC)",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": {
+      "min": 0.94,
+      "max": 4.19
+    },
+    "presion_max_bar": 8.0,
+    "potencia_kw": 22.0,
+    "dimensiones_mm": "800x1110x1530",
+    "fuente": "KAESER ASK Series technical data"
+  },
+  "ASK 34 T SFC": {
+    "familia": "ASK",
+    "configuracion": "Dryer + variable speed (T SFC)",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": {
+      "min": 0.94,
+      "max": 3.6
+    },
+    "presion_max_bar": 8.0,
+    "potencia_kw": 18.5,
+    "dimensiones_mm": "800x1460x1530",
+    "fuente": "KAESER ASK Series technical data"
+  },
+  "ASK 40 T SFC": {
+    "familia": "ASK",
+    "configuracion": "Dryer + variable speed (T SFC)",
+    "presion_trabajo_bar": 7.5,
+    "caudal_m3_min": {
+      "min": 0.94,
+      "max": 4.19
+    },
+    "presion_max_bar": 8.0,
+    "potencia_kw": 22.0,
+    "dimensiones_mm": "800x1460x1530",
+    "fuente": "KAESER ASK Series technical data"
   }
 }
