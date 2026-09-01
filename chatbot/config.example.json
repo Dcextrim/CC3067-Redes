@@ -1,0 +1,55 @@
+{
+  "llm": {
+    "model": "claude-haiku-4-5-20251001",
+    "maxTokens": 1500
+  },
+  "mcpServers": {
+    "kaeser_local": {
+      "enabled": true,
+      "required": true,
+      "transport": "stdio",
+      "command": "node",
+      "args": [
+        "${PROJECT_ROOT}/mcp-kaeser-server/server.js"
+      ],
+      "cwd": "${PROJECT_ROOT}"
+    },
+    "kaeser_remote": {
+      "enabled": false,
+      "required": true,
+      "transport": "http",
+      "url": "${KAESER_REMOTE_URL}",
+      "headers": {
+        "Authorization": "Bearer ${MCP_AUTH_TOKEN}"
+      }
+    },
+    "filesystem": {
+      "enabled": true,
+      "required": true,
+      "transport": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "${PROJECT_ROOT}/demo-workspace"
+      ],
+      "cwd": "${PROJECT_ROOT}",
+      "toolHint": "Only access the demonstration directory at ${PROJECT_ROOT}/demo-workspace."
+    },
+    "git": {
+      "enabled": true,
+      "required": true,
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-server-git",
+        "--repository",
+        "${PROJECT_ROOT}/demo-workspace"
+      ],
+      "cwd": "${PROJECT_ROOT}",
+      "toolHint": "Use ${PROJECT_ROOT}/demo-workspace as repo_path for every Git operation."
+    }
+  }
+}

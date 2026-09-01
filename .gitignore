@@ -1,2 +1,9 @@
+node_modules/
+tmp/
+.env
 mcp-kaeser-server/data/lecturas.json
 mcp-kaeser-server/data/lecturas.json.*.tmp
+chatbot/config.json
+chatbot/logs/
+chatbot/captures/
+demo-workspace/
