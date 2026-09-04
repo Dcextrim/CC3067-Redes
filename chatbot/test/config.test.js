@@ -12,7 +12,7 @@ test("configuration expands variables and ignores disabled server placeholders",
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "kaeser-chat-config-"));
     const configPath = path.join(directory, "config.json");
     fs.writeFileSync(configPath, JSON.stringify({
-        llm: { model: "test-model" },
+        llm: { provider: "groq", model: "test-model" },
         mcpServers: {
             local: { enabled: true, transport: "stdio", command: "node", args: ["${PROJECT_ROOT}/server.js"] },
             remote: { enabled: false, transport: "http", url: "${MISSING_REMOTE_URL}" }
@@ -21,6 +21,7 @@ test("configuration expands variables and ignores disabled server placeholders",
 
     try {
         const loaded = loadConfig(configPath);
+        assert.equal(loaded.config.llm.provider, "groq");
         assert.deepEqual(Object.keys(loaded.config.mcpServers), ["local"]);
         assert.match(loaded.config.mcpServers.local.args[0], /server\.js$/);
         assert.throws(() => expandValue("${NOT_DEFINED}", {}), /Missing environment variable/);

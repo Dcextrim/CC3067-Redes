@@ -1,7 +1,8 @@
 {
   "llm": {
-    "model": "claude-haiku-4-5-20251001",
-    "maxTokens": 1500
+    "provider": "gemini",
+    "model": "gemini-3.5-flash-lite",
+    "maxTokens": 4096
   },
   "mcpServers": {
     "kaeser_local": {

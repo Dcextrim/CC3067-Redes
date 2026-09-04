@@ -1,10 +1,10 @@
 {
   "name": "kaeser-mcp-chatbot",
   "version": "1.0.0",
-  "description": "Terminal MCP host backed by the Claude Messages API",
+  "description": "Terminal MCP host backed by the Groq, Gemini, or Claude API",
   "main": "chatbot.js",
   "scripts": {
-    "check:mcp": "node scripts/check-mcp.js --config config.example.json",
+    "check:mcp": "node scripts/check-mcp.js",
     "start": "node chatbot.js",
     "setup:demo": "node scripts/setup-demo-workspace.js",
     "test": "node --test"

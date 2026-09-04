@@ -4,6 +4,8 @@ const path = require("node:path");
 const readline = require("node:readline/promises");
 
 const { AnthropicClient } = require("./src/anthropic-client.js");
+const { GeminiClient } = require("./src/gemini-client.js");
+const { GroqClient } = require("./src/groq-client.js");
 const { ChatHost } = require("./src/chat-host.js");
 const { loadConfig } = require("./src/config.js");
 const { InteractionLogger } = require("./src/logger.js");
@@ -47,18 +49,47 @@ function printLog(logger, count) {
 }
 
 async function main() {
-    if (!process.env.ANTHROPIC_API_KEY) {
-        throw new Error("ANTHROPIC_API_KEY is required. Set it in the terminal before starting the chatbot.");
-    }
-
     const { config, projectRoot } = loadConfig(getConfigPath());
     const logger = new InteractionLogger(path.join(__dirname, "logs"));
-    const llmClient = new AnthropicClient({
-        apiKey: process.env.ANTHROPIC_API_KEY,
-        model: config.llm.model,
-        maxTokens: config.llm.maxTokens,
-        baseUrl: process.env.ANTHROPIC_BASE_URL
-    });
+    const provider = config.llm.provider || "anthropic";
+    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    let llmClient;
+
+    if (provider === "groq") {
+        if (!process.env.GROQ_API_KEY) {
+            throw new Error("GROQ_API_KEY is required for the Groq provider. Set it in the terminal before starting the chatbot.");
+        }
+        llmClient = new GroqClient({
+            apiKey: process.env.GROQ_API_KEY,
+            model: config.llm.model,
+            maxTokens: config.llm.maxTokens,
+            baseUrl: process.env.GROQ_BASE_URL
+        });
+    } else if (provider === "gemini") {
+        if (!geminiApiKey) {
+            throw new Error("GEMINI_API_KEY is required for the Gemini provider. Set it in the terminal before starting the chatbot.");
+        }
+        llmClient = new GeminiClient({
+            apiKey: geminiApiKey,
+            model: config.llm.model,
+            maxTokens: config.llm.maxTokens,
+            baseUrl: process.env.GEMINI_BASE_URL,
+            onRetry(event) {
+                const cause = event.statusCode ? `HTTP ${event.statusCode}` : event.errorCode || "network error";
+                console.warn(color.yellow(`[Gemini] Temporary ${cause}; retry ${event.attempt}/${event.maxRetries} in ${(event.delayMs / 1000).toFixed(1)}s...`));
+            }
+        });
+    } else {
+        if (!process.env.ANTHROPIC_API_KEY) {
+            throw new Error("ANTHROPIC_API_KEY is required for the Anthropic provider. Set it in the terminal before starting the chatbot.");
+        }
+        llmClient = new AnthropicClient({
+            apiKey: process.env.ANTHROPIC_API_KEY,
+            model: config.llm.model,
+            maxTokens: config.llm.maxTokens,
+            baseUrl: process.env.ANTHROPIC_BASE_URL
+        });
+    }
     const host = new ChatHost({
         config,
         logger,
@@ -73,12 +104,14 @@ async function main() {
             console.log(JSON.stringify(event.input, null, 2));
         },
         onAssistantText(text) {
-            console.log(`\n${color.bold("Claude:")} ${text}`);
+            const label = provider === "groq" ? "Groq:" : provider === "gemini" ? "Gemini:" : "Claude:";
+            console.log(`\n${color.bold(label)} ${text}`);
         }
     });
 
     console.log(color.bold("KAESER MCP Terminal Chatbot"));
     console.log(`Project: ${projectRoot}`);
+    console.log(`LLM provider: ${provider}`);
     console.log(`Model: ${config.llm.model}`);
     console.log(`MCP log: ${logger.filePath}\n`);
     await host.connect();

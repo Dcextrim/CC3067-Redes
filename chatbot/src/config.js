@@ -26,6 +26,8 @@ function expandValue(value, variables) {
 function validateConfig(config) {
     if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("The chatbot configuration must be a JSON object.");
     if (!config.llm || typeof config.llm !== "object") throw new Error("The chatbot configuration requires an llm object.");
+    if (!config.llm.provider) config.llm.provider = "anthropic";
+    if (!["anthropic", "gemini", "groq"].includes(config.llm.provider)) throw new Error(`Unsupported LLM provider: ${config.llm.provider}`);
     if (!config.llm.model || typeof config.llm.model !== "string") throw new Error("llm.model must be a non-empty string.");
     if (!config.mcpServers || typeof config.mcpServers !== "object" || Array.isArray(config.mcpServers)) {
         throw new Error("The chatbot configuration requires an mcpServers object.");
@@ -64,7 +66,11 @@ function loadConfig(configPath) {
         mcpServers: expandValue(enabledServers, variables)
     };
 
-    if (process.env.ANTHROPIC_MODEL) config.llm.model = process.env.ANTHROPIC_MODEL;
+    if (process.env.LLM_PROVIDER) config.llm.provider = process.env.LLM_PROVIDER;
+    if (process.env.LLM_MODEL) config.llm.model = process.env.LLM_MODEL;
+    if (config.llm.provider === "anthropic" && process.env.ANTHROPIC_MODEL) config.llm.model = process.env.ANTHROPIC_MODEL;
+    if (config.llm.provider === "gemini" && process.env.GEMINI_MODEL) config.llm.model = process.env.GEMINI_MODEL;
+    if (config.llm.provider === "groq" && process.env.GROQ_MODEL) config.llm.model = process.env.GROQ_MODEL;
     validateConfig(config);
     return { config, configPath: absolutePath, projectRoot };
 }
