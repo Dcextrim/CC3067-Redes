@@ -6,4 +6,11 @@ mcp-kaeser-server/data/lecturas.json.*.tmp
 chatbot/config.json
 chatbot/logs/
 chatbot/captures/
-demo-workspace/
+chatbot/**/captures/
+**/tls-keys*.log
+img/
+docs/
+COMMITS.md
+GUIA_CLAUDE_DESKTOP.md
+Proyecto 1 - Uso de un protocolo existente.pdf
+annotated-Propuesta%20de%20servidor%20MCP%20local-1.pdf
